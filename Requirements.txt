@@ -1,2 +1,3 @@
-openai
+openai>=0.27.8
 pillow>=10.0.0
+stability-sdk>=0.8.3
