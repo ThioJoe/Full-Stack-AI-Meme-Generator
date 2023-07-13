@@ -1,5 +1,4 @@
 import openai
-import json
 import re
 from base64 import b64decode
 from PIL import Image, ImageDraw, ImageFont
@@ -25,12 +24,14 @@ output_folder = "Outputs"
 # The font to use for the meme text. Must be put in the current folder or in the default Windows font directory, and must be a TrueType font file (.ttf). You can find font files in the C:\Windows\Fonts folder on Windows.
 font_file = "arial.ttf"
 
-# ----------------------------------------------
+# --------------------------------------------------------------------------------------------
 
 format_instructions = f'You are a meme generator with the following formatting instructions. Each meme will consist of text that will appear at the top, and an image to go along with it. The user will send you a message with a general theme or concept on which you will base the meme. The user may choose to send you a text saying something like "anything" or "whatever you want", or even no text at all, which you should not take literally, but take to mean they wish for you to come up with something yourself.  In any case, you will respond with two things: First, the text of the meme that will be displayed in the final meme. Second, some text that will be used as an image prompt for an AI image generator to generate an image to also be used as part of the meme. You must respond only in the format as described next, because your response will be parsed, so it is important it conforms to the format. The first line of your response should be: "Meme Text: " followed by the meme text. The second line of your response should be: "Image Prompt: " followed by the image prompt text. --- Now here are additional instructions... '
 basicInstructionAppend = f'Next are instructions for the overall approach you should take to creating the memes. Interpret as best as possible: {basic_instructions} | '
 specialInstructionsAppend = f'Next are any special instructions for the image prompt. For example, if the instructions are "the images should be photographic style", your prompt may append ", photograph" at the end, or begin with "photograph of". It does not have to literally match the instruction but interpret as best as possible: {image_special_instructions}'
 systemPrompt = format_instructions + basicInstructionAppend + specialInstructionsAppend
+
+# --------------------------------------------------------------------------------------------
 
 # Check for font file in current directory, then check for font file in Fonts folder, warn user and exit if not found
 if not os.path.isfile(font_file):
@@ -59,7 +60,7 @@ openai.api_key = load_api_key()
 def set_file_path(baseName, outputFolder):
     def generate_random_string(length):
         # Define the characters to choose from
-        characters = string.ascii_lowercase + string.digits
+        characters = string.ascii_uppercase
         # Generate a random string of specified length
         random_string = ''.join(random.choice(characters) for _ in range(length))
         return random_string
@@ -79,7 +80,12 @@ def set_file_path(baseName, outputFolder):
     
     return filePath
     
-    
+# Write or append log file containing the user user message, chat bot meme text, and chat bot image prompt for each meme
+def write_log_file(userPrompt, AiMemeDict, logFolder, filePath):
+    # Get file name from path
+    memeFileName = os.path.basename(filePath)
+    with open(os.path.join(logFolder, "log.txt"), "a", encoding='utf-8') as log_file:
+        log_file.write(f"User Prompt: '{userPrompt}'\nMeme File Name: {memeFileName}\nChat Bot Meme Text: {AiMemeDict['meme_text']}\nChat Bot Image Prompt: {AiMemeDict['image_prompt']}\n\n")
 
 # Gets the meme text and image prompt from the message sent by the chat bot
 def parse_meme(message):
@@ -116,7 +122,7 @@ def send_and_receive_message(userMessage, conversationTemp, temperature=0.5):
     return chatResponseMessage
 
 
-def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.06, buffer_scale=0.03, font_scale=1):
+def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.05, buffer_scale=0.03, font_scale=1):
     print("Creating meme image...")
     
     # Load the image
@@ -177,7 +183,7 @@ def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.06, buffer
     new_img.save(filePath)
     
 
-# ----------------------------------------------
+# ==================== MAIN ====================
 
 conversation = [{"role": "system", "content": systemPrompt}]
 
@@ -212,3 +218,4 @@ virtual_image_file.write(image_data)
 # Combine the meme text and image into a meme
 filePath = set_file_path(base_file_name, output_folder)
 create_meme(virtual_image_file, meme_text, filePath, fontFile=font_file)
+write_log_file(userEnteredPrompt, memeDict, output_folder, filePath)
