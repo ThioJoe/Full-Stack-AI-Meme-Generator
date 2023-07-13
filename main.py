@@ -133,7 +133,7 @@ def send_and_receive_message(userMessage, conversationTemp, temperature=0.5):
 def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.05, buffer_scale=0.03, font_scale=1):
     print("Creating meme image...")
     
-    # Load the image
+    # Load the image. Can be a path or a file-like object such as IO.BytesIO virtual file
     image = Image.open(image_path)
 
     # Calculate buffer size based on buffer_scale
