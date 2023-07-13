@@ -7,6 +7,7 @@ from datetime import datetime
 import random
 import string
 import os
+import textwrap
 
 # Some Models:
 # gpt-4
@@ -81,11 +82,18 @@ def set_file_path(baseName, outputFolder):
     return filePath
     
 # Write or append log file containing the user user message, chat bot meme text, and chat bot image prompt for each meme
-def write_log_file(userPrompt, AiMemeDict, logFolder, filePath):
+def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, basic=basic_instructions, special=image_special_instructions):
     # Get file name from path
     memeFileName = os.path.basename(filePath)
     with open(os.path.join(logFolder, "log.txt"), "a", encoding='utf-8') as log_file:
-        log_file.write(f"User Prompt: '{userPrompt}'\nMeme File Name: {memeFileName}\nChat Bot Meme Text: {AiMemeDict['meme_text']}\nChat Bot Image Prompt: {AiMemeDict['image_prompt']}\n\n")
+        log_file.write(textwrap.dedent(f"""
+                       Meme File Name: {memeFileName}
+                       AI Basic Instructions: {basic}
+                       AI Special Image Instructions: {special}
+                       User Prompt: '{userPrompt}'
+                       Chat Bot Meme Text: {AiMemeDict['meme_text']}
+                       Chat Bot Image Prompt: {AiMemeDict['image_prompt']}
+                       \n"""))
 
 # Gets the meme text and image prompt from the message sent by the chat bot
 def parse_meme(message):
@@ -218,4 +226,4 @@ virtual_image_file.write(image_data)
 # Combine the meme text and image into a meme
 filePath = set_file_path(base_file_name, output_folder)
 create_meme(virtual_image_file, meme_text, filePath, fontFile=font_file)
-write_log_file(userEnteredPrompt, memeDict, output_folder, filePath)
+write_log_file(userEnteredPrompt, memeDict, filePath)
