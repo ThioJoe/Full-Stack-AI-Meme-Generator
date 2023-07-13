@@ -1,4 +1,11 @@
+# Import installed libraries
 import openai
+from stability_sdk import client
+import stability_sdk.interfaces.gooseai.generation.generation_pb2 as generation
+
+# Import standard libraries
+import requests
+import warnings
 import re
 from base64 import b64decode
 from PIL import Image, ImageDraw, ImageFont
@@ -9,14 +16,22 @@ import string
 import os
 import textwrap
 
-# Some Models:
-# gpt-4
-# gpt-3.5-turbo-16k
+# Import local script files
+import utils
 
-model = "gpt-4"
-temperature = 1
-basic_instructions = r'You will create funny memes.'
-image_special_instructions = r'The images should be photographic.'
+# ----------------------------------------- Settings -----------------------------------------
+
+# Settings for OpenAI API to generate text to be used as the meme text and image prompt
+text_model = "gpt-4" # Some model examples: "gpt-4", "gpt-3.5-turbo-16k"
+temperature = 0.7 # Controls randomness. Lowering results in less random completions. Higher temperature results in more random completions.
+
+# Image Platform settings
+image_platform = "openai" # Possible options: "openai", "stability", "clipdrop"
+
+# This is NOT the individual meme image prompt. Here you can change this to tell it the general style or qualities to apply to all memes, such as using dark humor, surreal humor, wholesome, etc. 
+basic_instructions = r'You will create funny memes.' 
+# You can use this to tell it how to generate the image itself. You can specify a style such as being a photograph, drawing, etc, or something more specific such as always use cats in the pictures.
+image_special_instructions = r'The images should be photographic.' 
 
 # Outputted file names will be based on this text. For example, 'meme' will create 'meme.png', 'meme-1.png', 'meme-2.png', etc.
 base_file_name = "meme"
@@ -25,14 +40,16 @@ output_folder = "Outputs"
 # The font to use for the meme text. Must be put in the current folder or in the default Windows font directory, and must be a TrueType font file (.ttf). You can find font files in the C:\Windows\Fonts folder on Windows.
 font_file = "arial.ttf"
 
-# --------------------------------------------------------------------------------------------
 
+# ==============================================================================================
+
+# Construct the system prompt for the chat bot
 format_instructions = f'You are a meme generator with the following formatting instructions. Each meme will consist of text that will appear at the top, and an image to go along with it. The user will send you a message with a general theme or concept on which you will base the meme. The user may choose to send you a text saying something like "anything" or "whatever you want", or even no text at all, which you should not take literally, but take to mean they wish for you to come up with something yourself.  In any case, you will respond with two things: First, the text of the meme that will be displayed in the final meme. Second, some text that will be used as an image prompt for an AI image generator to generate an image to also be used as part of the meme. You must respond only in the format as described next, because your response will be parsed, so it is important it conforms to the format. The first line of your response should be: "Meme Text: " followed by the meme text. The second line of your response should be: "Image Prompt: " followed by the image prompt text. --- Now here are additional instructions... '
 basicInstructionAppend = f'Next are instructions for the overall approach you should take to creating the memes. Interpret as best as possible: {basic_instructions} | '
 specialInstructionsAppend = f'Next are any special instructions for the image prompt. For example, if the instructions are "the images should be photographic style", your prompt may append ", photograph" at the end, or begin with "photograph of". It does not have to literally match the instruction but interpret as best as possible: {image_special_instructions}'
 systemPrompt = format_instructions + basicInstructionAppend + specialInstructionsAppend
 
-# --------------------------------------------------------------------------------------------
+# =============================================== Run Checks and Import Configs  ===============================================
 
 # Check for font file in current directory, then check for font file in Fonts folder, warn user and exit if not found
 if not os.path.isfile(font_file):
@@ -42,20 +59,58 @@ if not os.path.isfile(font_file):
         input("\nPress Enter to exit...")
         exit()
 
-# Load API key from key.txt file
-def load_api_key(filename="key.txt"):
-    try:
-        with open(filename, "r", encoding='utf-8') as key_file:
-            for line in key_file:
-                stripped_line = line.strip()
-                if not stripped_line.startswith('#') and stripped_line != '':
-                    api_key = stripped_line
-                    break
-        return api_key
-    except FileNotFoundError:
-        print("\nAPI key file not found. Please create a file named 'key.txt' in the same directory as this script and paste your API key in it.\n")
+# Get API key constants from config file
+keysDict = utils.getConfig("api_keys.ini")
+OPENAI_KEY = keysDict['OpenAI']
+CLIPDROP_KEY = keysDict['ClipDrop']
+STABILITY_KEY = keysDict['StabilityAI']
+
+has_openai_key, has_clipdrop_key, has_stability_key = False, False, False
+
+if OPENAI_KEY:
+    has_openai_key = True
+    openai.api_key = OPENAI_KEY
+
+if STABILITY_KEY:
+    has_stability_key = True
+    stability_api = client.StabilityInference(
+        key=STABILITY_KEY, # API Key reference.
+        verbose=True, # Print debug messages.
+        engine="stable-diffusion-xl-1024-v0-9", # Set the engine to use for generation.
+        # Available engines: stable-diffusion-xl-1024-v0-9 stable-diffusion-v1 stable-diffusion-v1-5 stable-diffusion-512-v2-0 stable-diffusion-768-v2-0
+        # stable-diffusion-512-v2-1 stable-diffusion-768-v2-1 stable-diffusion-xl-beta-v2-2-2 stable-inpainting-v1-0 stable-inpainting-512-v2-0
+    )
+
+if CLIPDROP_KEY:
+    has_clipdrop_key = True
+
+# Warn about missing API Keys
+if not has_openai_key:
+    print("\n  ERROR:  No OpenAI API key found. OpenAI API key is required - In order to generate text for the meme text and image prompt. Please add your OpenAI API key to the api_keys.ini file.")
+    input("\nPress Enter to exit...")
+    exit()
+
+# Validate selected image platform and ensure API key is present
+valid_image_platforms = ["openai", "stability", "clipdrop"]
+image_platform = image_platform.lower()
+
+       
+if image_platform in valid_image_platforms:
+    if image_platform == "stability" and not has_stability_key:
+        print("\n  ERROR:  Stability AI was set as the image platform, but no Stability AI API key was found in the api_keys.ini file.")
+        input("\nPress Enter to exit...")
         exit()
-openai.api_key = load_api_key()
+    if image_platform == "clipdrop" and not has_clipdrop_key:
+        print("\n  ERROR:  ClipDrop was set as the image platform, but no ClipDrop API key was found in the api_keys.ini file.")
+        input("\nPress Enter to exit...")
+        exit()
+else:
+    print(f'\n  ERROR:  Invalid image platform "{image_platform}". Valid image platforms are: {valid_image_platforms}')
+    input("\nPress Enter to exit...")
+    exit()
+
+
+# =============================================== Functions ================================================
 
 # Sets the name and path of the file to be used
 def set_file_path(baseName, outputFolder):
@@ -82,7 +137,7 @@ def set_file_path(baseName, outputFolder):
     return filePath
     
 # Write or append log file containing the user user message, chat bot meme text, and chat bot image prompt for each meme
-def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, basic=basic_instructions, special=image_special_instructions):
+def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, basic=basic_instructions, special=image_special_instructions, platform=image_platform):
     # Get file name from path
     memeFileName = os.path.basename(filePath)
     with open(os.path.join(logFolder, "log.txt"), "a", encoding='utf-8') as log_file:
@@ -93,6 +148,7 @@ def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, ba
                        User Prompt: '{userPrompt}'
                        Chat Bot Meme Text: {AiMemeDict['meme_text']}
                        Chat Bot Image Prompt: {AiMemeDict['image_prompt']}
+                       Image Generation Platform: {platform}
                        \n"""))
 
 # Gets the meme text and image prompt from the message sent by the chat bot
@@ -116,7 +172,7 @@ def send_and_receive_message(userMessage, conversationTemp, temperature=0.5):
     
     print("Sending request to write meme...")
     chatResponse = openai.ChatCompletion.create(
-        model=model,
+        model=text_model,
         messages=conversationTemp,
         temperature=temperature
         )
@@ -189,7 +245,55 @@ def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.05, buffer
 
     # Save the result to a file
     new_img.save(filePath)
+
+def image_generation_request(image_prompt, platform):
+    if platform == "openai":
+        openai_response = openai.Image.create(prompt=image_prompt, n=1, size="512x512", response_format="b64_json")
+        # Convert image data to virtual file
+        image_data = b64decode(openai_response["data"][0]["b64_json"])
+        virtual_image_file = io.BytesIO()
+        # Write the image data to the virtual file
+        virtual_image_file.write(image_data)
     
+    if platform == "stability":
+        # Set up our initial generation parameters.
+        stability_response = stability_api.generate(
+            prompt=image_prompt,
+            #seed=992446758, # If a seed is provided, the resulting generated image will be deterministic.
+            steps=30,       # Amount of inference steps performed on image generation. Defaults to 30.
+            cfg_scale=7.0,  # Influences how strongly your generation is guided to match your prompt. Setting this value higher increases the strength in which it tries to match your prompt. Defaults to 7.0 if not specified.
+            width=1024, # Generation width, if not included defaults to 512 or 1024 depending on the engine.
+            height=1024, # Generation height, if not included defaults to 512 or 1024 depending on the engine.
+            samples=1, # Number of images to generate, defaults to 1 if not included.
+            sampler=generation.SAMPLER_K_DPMPP_2M   # Choose which sampler we want to denoise our generation with. Defaults to k_dpmpp_2m if not specified. Clip Guidance only supports ancestral samplers.
+                                                    # (Available Samplers: ddim, plms, k_euler, k_euler_ancestral, k_heun, k_dpm_2, k_dpm_2_ancestral, k_dpmpp_2s_ancestral, k_lms, k_dpmpp_2m, k_dpmpp_sde)
+        )
+
+        # Set up our warning to print to the console if the adult content classifier is tripped. If adult content classifier is not tripped, save generated images.
+        for resp in stability_response:
+            for artifact in resp.artifacts:
+                if artifact.finish_reason == generation.FILTER:
+                    warnings.warn(
+                        "Your request activated the API's safety filters and could not be processed."
+                        "Please modify the prompt and try again.")
+                if artifact.type == generation.ARTIFACT_IMAGE:
+                    #img = Image.open(io.BytesIO(artifact.binary))
+                    #img.save(str(artifact.seed)+ ".png") # Save our generated images with their seed number as the filename.
+                    virtual_image_file = io.BytesIO(artifact.binary)
+                    
+    if platform == "clipdrop":
+        r = requests.post('https://clipdrop-api.co/text-to-image/v1',
+            files = {
+                'prompt': (None, image_prompt, 'text/plain')
+            },
+            headers = { 'x-api-key': CLIPDROP_KEY}
+        )
+        if (r.ok):
+            virtual_image_file = io.BytesIO(r.content) # r.content contains the bytes of the returned image
+        else:
+            r.raise_for_status()
+            
+    return virtual_image_file
 
 # ==================== MAIN ====================
 
@@ -215,13 +319,7 @@ print("   Image Prompt:  " + image_prompt)
 
 # Send image prompt to image generator and get image back (Using DALL·E API)
 print("\nSending image creation request...")
-image_response = openai.Image.create(prompt=image_prompt, n=1, size="512x512", response_format="b64_json")
-
-# Convert image data to virtual file
-image_data = b64decode(image_response["data"][0]["b64_json"])
-virtual_image_file = io.BytesIO()
-# Write the image data to the virtual file
-virtual_image_file.write(image_data)
+virtual_image_file = image_generation_request(image_prompt, image_platform)
 
 # Combine the meme text and image into a meme
 filePath = set_file_path(base_file_name, output_folder)
