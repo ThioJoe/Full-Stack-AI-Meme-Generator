@@ -51,7 +51,7 @@ font_file = "arial.ttf"
 # ==============================================================================================
 
 # Construct the system prompt for the chat bot
-format_instructions = f'You are a meme generator with the following formatting instructions. Each meme will consist of text that will appear at the top, and an image to go along with it. The user will send you a message with a general theme or concept on which you will base the meme. The user may choose to send you a text saying something like "anything" or "whatever you want", or even no text at all, which you should not take literally, but take to mean they wish for you to come up with something yourself.  In any case, you will respond with two things: First, the text of the meme that will be displayed in the final meme. Second, some text that will be used as an image prompt for an AI image generator to generate an image to also be used as part of the meme. You must respond only in the format as described next, because your response will be parsed, so it is important it conforms to the format. The first line of your response should be: "Meme Text: " followed by the meme text. The second line of your response should be: "Image Prompt: " followed by the image prompt text. --- Now here are additional instructions... '
+format_instructions = f'You are a meme generator with the following formatting instructions. Each meme will consist of text that will appear at the top, and an image to go along with it. The user will send you a message with a general theme or concept on which you will base the meme. The user may choose to send you a text saying something like "anything" or "whatever you want", or even no text at all, which you should not take literally, but take to mean they wish for you to come up with something yourself.  The memes don\'t necessarily need to start with "when", but they can. In any case, you will respond with two things: First, the text of the meme that will be displayed in the final meme. Second, some text that will be used as an image prompt for an AI image generator to generate an image to also be used as part of the meme. You must respond only in the format as described next, because your response will be parsed, so it is important it conforms to the format. The first line of your response should be: "Meme Text: " followed by the meme text (without the quotes). The second line of your response should be: "Image Prompt: " (without the quotes) followed by the image prompt text. And don\'t put quotes around the meme text or image prompt text.  --- Now here are additional instructions... '
 basicInstructionAppend = f'Next are instructions for the overall approach you should take to creating the memes. Interpret as best as possible: {basic_instructions} | '
 specialInstructionsAppend = f'Next are any special instructions for the image prompt. For example, if the instructions are "the images should be photographic style", your prompt may append ", photograph" at the end, or begin with "photograph of". It does not have to literally match the instruction but interpret as best as possible: {image_special_instructions}'
 systemPrompt = format_instructions + basicInstructionAppend + specialInstructionsAppend
@@ -386,7 +386,9 @@ def main():
         create_meme(virtual_image_file, meme_text, filePath, fontFile=font_file)
         write_log_file(userEnteredPrompt, memeDict, filePath)
         
-        return {"meme_text": meme_text, "image_prompt": image_prompt, "file_path": filePath}
+        absoluteFilePath = os.path.abspath(filePath)
+        
+        return {"meme_text": meme_text, "image_prompt": image_prompt, "file_path": absoluteFilePath}
 
     # Create list of dictionaries to hold the results of each meme so that they can be returned by main() if called from command line
     memeResultsDictsList = []
