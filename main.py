@@ -20,6 +20,8 @@ import random
 import string
 import os
 import textwrap
+import sys
+import argparse
 
 # Import local script files
 import utils
@@ -302,46 +304,103 @@ def image_generation_request(image_prompt, platform):
 
 # ==================== RUN ====================
 
-conversation = [{"role": "system", "content": systemPrompt}]
-userEnteredPrompt = ""
-
-print("\nEnter a meme subject or concept (Or just hit enter to let the AI decide)")
-userEnteredPrompt = input(" >  ")
-if not userEnteredPrompt:
-    userEnteredPrompt = "anything"
+def main():
+    # Set global variables from top of script
+    global basic_instructions
+    global image_special_instructions
+    global image_platform
+    global temperature
     
-# Set the number of memes to create
-meme_count = 1
-print("\nEnter the number of memes to create (Or just hit Enter for 1): ")
-userEnteredCount = input(" >  ")
-if userEnteredCount:
-    meme_count = int(userEnteredCount)
+    # Use arguments if applicable
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--userPrompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
+    parser.add_argument("--memeCount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
+    parser.add_argument("--imagePlatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
+    parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
+    parser.add_argument("--basicInstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
+    parser.add_argument("--imageSpecialInstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Check if any settings arguments, and replace the default values with the args if so
+    if args.imagePlatform:
+        image_platform = args.imagePlatform
+    if args.temperature:
+        temperature = float(args.temperature)
+    if args.basicInstructions:
+        basic_instructions = args.basicInstructions
+    if args.imageSpecialInstructions:
+        image_special_instructions = args.imageSpecialInstructions
+        
+
+    conversation = [{"role": "system", "content": systemPrompt}]
+    userEnteredPrompt = ""
+
+    # ---------- Start User Input -----------
+
+    # If any arguments are being used, skip the user input
+    if all(value is None for value in vars(args).values()):
+        print("\nEnter a meme subject or concept (Or just hit enter to let the AI decide)")
+        userEnteredPrompt = input(" >  ")
+        if not userEnteredPrompt:
+            userEnteredPrompt = "anything"
+            
+        # Set the number of memes to create
+        meme_count = 1
+        print("\nEnter the number of memes to create (Or just hit Enter for 1): ")
+        userEnteredCount = input(" >  ")
+        if userEnteredCount:
+            meme_count = int(userEnteredCount)
+
+    else:
+        if args.userPrompt:
+            userEnteredPrompt = args.userPrompt
+        else:
+            userEnteredPrompt = "anything"
+
+        meme_count = 1
+        if args.memeCount:
+            meme_count = int(args.memeCount)
 
 
-def single_meme_generation_loop():
+    def single_meme_generation_loop():
+        # Send request to chat bot to generate meme text and image prompt
+        chatResponse = send_and_receive_message(userEnteredPrompt, conversation, temperature)
+
+        # Take chat message and convert to dictionary with meme_text and image_prompt
+        memeDict = parse_meme(chatResponse)
+        image_prompt = memeDict['image_prompt']
+        meme_text = memeDict['meme_text']
+
+        # Print the meme text and image prompt
+        print("\n   Meme Text:  " + meme_text)
+        print("   Image Prompt:  " + image_prompt)
+
+        # Send image prompt to image generator and get image back (Using DALL·E API)
+        print("\nSending image creation request...")
+        virtual_image_file = image_generation_request(image_prompt, image_platform)
+
+        # Combine the meme text and image into a meme
+        filePath = set_file_path(base_file_name, output_folder)
+        create_meme(virtual_image_file, meme_text, filePath, fontFile=font_file)
+        write_log_file(userEnteredPrompt, memeDict, filePath)
+        
+        return {"meme_text": meme_text, "image_prompt": image_prompt, "file_path": filePath}
+
+    # Create list of dictionaries to hold the results of each meme so that they can be returned by main() if called from command line
+    memeResultsDictsList = []
+
+    for i in range(meme_count):
+        print("\n----------------------------------------------------------------------------------------------------")
+        print(f"Generating meme {i+1} of {meme_count}...")
+        memeInfoDict = single_meme_generation_loop()
+
+        # Add meme info dict to list of meme results
+        memeResultsDictsList.append(memeInfoDict)
     
-    # Send request to chat bot to generate meme text and image prompt
-    chatResponse = send_and_receive_message(userEnteredPrompt, conversation, temperature)
+    # If called from command line, will return the list of meme results
+    return memeResultsDictsList
 
-    # Take chat message and convert to dictionary with meme_text and image_prompt
-    memeDict = parse_meme(chatResponse)
-    image_prompt = memeDict['image_prompt']
-    meme_text = memeDict['meme_text']
-
-    # Print the meme text and image prompt
-    print("\n   Meme Text:  " + meme_text)
-    print("   Image Prompt:  " + image_prompt)
-
-    # Send image prompt to image generator and get image back (Using DALL·E API)
-    print("\nSending image creation request...")
-    virtual_image_file = image_generation_request(image_prompt, image_platform)
-
-    # Combine the meme text and image into a meme
-    filePath = set_file_path(base_file_name, output_folder)
-    create_meme(virtual_image_file, meme_text, filePath, fontFile=font_file)
-    write_log_file(userEnteredPrompt, memeDict, filePath)
-
-for i in range(meme_count):
-    print("\n----------------------------------------------------------------------------------------------------")
-    print(f"Generating meme {i+1} of {meme_count}...")
-    single_meme_generation_loop()
+if __name__ == "__main__":
+    main()
