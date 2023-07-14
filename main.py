@@ -31,10 +31,10 @@ text_model = "gpt-4" # Some model examples: "gpt-4", "gpt-3.5-turbo-16k"
 temperature = 0.7 # Controls randomness. Lowering results in less random completions. Higher temperature results in more random completions.
 
 # Image Platform settings
-image_platform = "openai" # Possible options: "openai", "stability", "clipdrop"
+image_platform = "clipdrop" # Possible options: "openai", "stability", "clipdrop"
 
 # This is NOT the individual meme image prompt. Here you can change this to tell it the general style or qualities to apply to all memes, such as using dark humor, surreal humor, wholesome, etc. 
-basic_instructions = r'You will create funny memes.' 
+basic_instructions = r'You will create funny memes that are clever and original, and not cliche or lame.'
 # You can use this to tell it how to generate the image itself. You can specify a style such as being a photograph, drawing, etc, or something more specific such as always use cats in the pictures.
 image_special_instructions = r'The images should be photographic.' 
 
@@ -300,33 +300,48 @@ def image_generation_request(image_prompt, platform):
             
     return virtual_image_file
 
-# ==================== MAIN ====================
+# ==================== RUN ====================
 
 conversation = [{"role": "system", "content": systemPrompt}]
+userEnteredPrompt = ""
 
-while True:
-    userEnteredPrompt = input("\n Enter a meme subject or concept: ")
-    if not userEnteredPrompt:
-        userEnteredPrompt = "anything"
-    if userEnteredPrompt:
-        print("----------------------------------------------------------------------------------------------------")
-        chatResponse = send_and_receive_message(userEnteredPrompt, conversation, temperature)
-        break
+print("\nEnter a meme subject or concept (Or just hit enter to let the AI decide)")
+userEnteredPrompt = input(" >  ")
+if not userEnteredPrompt:
+    userEnteredPrompt = "anything"
+    
+# Set the number of memes to create
+meme_count = 1
+print("\nEnter the number of memes to create (Or just hit Enter for 1): ")
+userEnteredCount = input(" >  ")
+if userEnteredCount:
+    meme_count = int(userEnteredCount)
 
-# Take chat message and convert to dictionary with meme_text and image_prompt
-memeDict = parse_meme(chatResponse)
-image_prompt = memeDict['image_prompt']
-meme_text = memeDict['meme_text']
 
-# Print the meme text and image prompt
-print("\n   Meme Text:  " + meme_text)
-print("   Image Prompt:  " + image_prompt)
+def single_meme_generation_loop():
+    
+    # Send request to chat bot to generate meme text and image prompt
+    chatResponse = send_and_receive_message(userEnteredPrompt, conversation, temperature)
 
-# Send image prompt to image generator and get image back (Using DALL·E API)
-print("\nSending image creation request...")
-virtual_image_file = image_generation_request(image_prompt, image_platform)
+    # Take chat message and convert to dictionary with meme_text and image_prompt
+    memeDict = parse_meme(chatResponse)
+    image_prompt = memeDict['image_prompt']
+    meme_text = memeDict['meme_text']
 
-# Combine the meme text and image into a meme
-filePath = set_file_path(base_file_name, output_folder)
-create_meme(virtual_image_file, meme_text, filePath, fontFile=font_file)
-write_log_file(userEnteredPrompt, memeDict, filePath)
+    # Print the meme text and image prompt
+    print("\n   Meme Text:  " + meme_text)
+    print("   Image Prompt:  " + image_prompt)
+
+    # Send image prompt to image generator and get image back (Using DALL·E API)
+    print("\nSending image creation request...")
+    virtual_image_file = image_generation_request(image_prompt, image_platform)
+
+    # Combine the meme text and image into a meme
+    filePath = set_file_path(base_file_name, output_folder)
+    create_meme(virtual_image_file, meme_text, filePath, fontFile=font_file)
+    write_log_file(userEnteredPrompt, memeDict, filePath)
+
+for i in range(meme_count):
+    print("\n----------------------------------------------------------------------------------------------------")
+    print(f"Generating meme {i+1} of {meme_count}...")
+    single_meme_generation_loop()
