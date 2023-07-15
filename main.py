@@ -68,15 +68,15 @@ if not os.path.isfile(font_file):
         
 # Parse the arguments at the start of the script
 parser = argparse.ArgumentParser()
-parser.add_argument("--openaiKey", help="OpenAI API key")
-parser.add_argument("--clipdropKey", help="ClipDrop API key")
-parser.add_argument("--stabilityKey", help="Stability AI API key")
-parser.add_argument("--userPrompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
-parser.add_argument("--memeCount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
-parser.add_argument("--imagePlatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
+parser.add_argument("--openai-key", help="OpenAI API key")
+parser.add_argument("--clipdrop-key", help="ClipDrop API key")
+parser.add_argument("--stability-key", help="Stability AI API key")
+parser.add_argument("--user-prompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
+parser.add_argument("--meme-count", help="The number of memes to create. If using arguments and not specified, the default is 1.")
+parser.add_argument("--image-platform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
 parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
-parser.add_argument("--basicInstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
-parser.add_argument("--imageSpecialInstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+parser.add_argument("--basic-instructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
+parser.add_argument("--image-special-instructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
 args = parser.parse_args()
 
 # Get API key constants from config file or command line arguments
