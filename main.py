@@ -23,6 +23,7 @@ import textwrap
 import sys
 import argparse
 import configparser
+import platform
 
 
 # ----------------------------------------- Settings -----------------------------------------
@@ -58,24 +59,42 @@ systemPrompt = format_instructions + basicInstructionAppend + specialInstruction
 # =============================================== Run Checks and Import Configs  ===============================================
 
 # Check for font file in current directory, then check for font file in Fonts folder, warn user and exit if not found
-if not os.path.isfile(font_file):
-    font_file = os.path.join(os.environ['WINDIR'], 'Fonts', font_file)
+def check_font(font_file):
+    # Check for font file in current directory
     if not os.path.isfile(font_file):
-        print(f'\n  ERROR:  Font file "{font_file}" not found. Please add the font file to the same folder as this script. Or set the variable above to the name of a font file in the C:\\Windows\\Fonts folder.')
-        input("\nPress Enter to exit...")
-        exit()
+        if platform.system() == "Windows":
+            # Check for font file in Fonts folder (Windows)
+            font_file = os.path.join(os.environ['WINDIR'], 'Fonts', font_file)
+        elif platform.system() == "Linux":
+            # Check for font file in font directories (Linux)
+            font_directories = ["/usr/share/fonts", "~/.fonts"]
+            for dir in font_directories:
+                potential_font_file = os.path.join(dir, font_file)
+                if os.path.isfile(potential_font_file):
+                    font_file = potential_font_file
+                    break
+        # Warn user and exit if not found
+        if not os.path.isfile(font_file):
+            print(f'\n  ERROR:  Font file "{font_file}" not found. Please add the font file to the same folder as this script. Or set the variable above to the name of a font file in the system font folder.')
+            input("\nPress Enter to exit...")
+            exit()
+    # Return the font file path
+    return font_file
+
+# Get full path of font file from font file name
+font_file = check_font(font_file)
         
 # Parse the arguments at the start of the script
 parser = argparse.ArgumentParser()
-parser.add_argument("--openai-key", help="OpenAI API key")
-parser.add_argument("--clipdrop-key", help="ClipDrop API key")
-parser.add_argument("--stability-key", help="Stability AI API key")
-parser.add_argument("--user-prompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
-parser.add_argument("--meme-count", help="The number of memes to create. If using arguments and not specified, the default is 1.")
-parser.add_argument("--image-platform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
+parser.add_argument("--openaikey", help="OpenAI API key")
+parser.add_argument("--clipdropkey", help="ClipDrop API key")
+parser.add_argument("--stabilitykey", help="Stability AI API key")
+parser.add_argument("--userprompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
+parser.add_argument("--memecount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
+parser.add_argument("--imageplatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
 parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
-parser.add_argument("--basic-instructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
-parser.add_argument("--image-special-instructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+parser.add_argument("--basicinstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
+parser.add_argument("--imagespecialinstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
 args = parser.parse_args()
 
 # Returns a dictionary of the config file
@@ -95,13 +114,13 @@ def getConfig(configFilePath):
 # Get API key constants from config file or command line arguments
 try:
     keysDict = getConfig("api_keys.ini")
-    OPENAI_KEY = args.openaiKey if args.openaiKey else keysDict.get('OpenAI', '')
-    CLIPDROP_KEY = args.clipdropKey if args.clipdropKey else keysDict.get('ClipDrop', '')
-    STABILITY_KEY = args.stabilityKey if args.stabilityKey else keysDict.get('StabilityAI', '')
+    OPENAI_KEY = args.openaikey if args.openaikey else keysDict.get('OpenAI', '')
+    CLIPDROP_KEY = args.clipdropkey if args.clipdropkey else keysDict.get('ClipDrop', '')
+    STABILITY_KEY = args.stabilitykey if args.stabilitykey else keysDict.get('StabilityAI', '')
 except FileNotFoundError:
-    OPENAI_KEY = args.openaiKey if args.openaiKey else ''
-    CLIPDROP_KEY = args.clipdropKey if args.clipdropKey else ''
-    STABILITY_KEY = args.stabilityKey if args.stabilityKey else ''
+    OPENAI_KEY = args.openaikey if args.openaikey else ''
+    CLIPDROP_KEY = args.clipdropkey if args.clipdropkey else ''
+    STABILITY_KEY = args.stabilitykey if args.stabilitykey else ''
 
 has_openai_key, has_clipdrop_key, has_stability_key = False, False, False
 
@@ -241,7 +260,7 @@ def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.05, buffer
 
     # Initialize the font size and wrapped text
     font_size = int(font_scale * image.width)
-    fnt = ImageFont.truetype('arial.ttf', font_size)
+    fnt = ImageFont.truetype(fontFile, font_size)
     wrapped_text = top_text
 
     # Try to fit the text on a single line by reducing the font size
@@ -344,30 +363,30 @@ def main():
     
     # # Use arguments if applicable
     # parser = argparse.ArgumentParser()
-    # parser.add_argument("--userPrompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
-    # parser.add_argument("--memeCount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
-    # parser.add_argument("--imagePlatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
+    # parser.add_argument("--userprompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
+    # parser.add_argument("--memecount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
+    # parser.add_argument("--imageplatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
     # parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
-    # parser.add_argument("--basicInstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
-    # parser.add_argument("--imageSpecialInstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+    # parser.add_argument("--basicinstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
+    # parser.add_argument("--imagespecialinstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
     
     # # # Get API Keys via arguments
-    # # parser.add_argument("--openaiKey", help="Your OpenAI key. If not specified, the key will be read from the config file.")
-    # # parser.add_argument("--clipdropKey", help="Your ClipDrop key. If not specified, the key will be read from the config file.")
-    # # parser.add_argument("--stabilityKey", help="Your Stability key. If not specified, the key will be read from the config file.")
+    # # parser.add_argument("--openaikey", help="Your OpenAI key. If not specified, the key will be read from the config file.")
+    # # parser.add_argument("--clipdropkey", help="Your ClipDrop key. If not specified, the key will be read from the config file.")
+    # # parser.add_argument("--stabilitykey", help="Your Stability key. If not specified, the key will be read from the config file.")
 
     # Parse the arguments
     args = parser.parse_args()
 
     # Check if any settings arguments, and replace the default values with the args if so. To run automated from command line, specify at least 1 argument.
-    if args.imagePlatform:
-        image_platform = args.imagePlatform
+    if args.imageplatform:
+        image_platform = args.imageplatform
     if args.temperature:
         temperature = float(args.temperature)
-    if args.basicInstructions:
-        basic_instructions = args.basicInstructions
-    if args.imageSpecialInstructions:
-        image_special_instructions = args.imageSpecialInstructions
+    if args.basicinstructions:
+        basic_instructions = args.basicinstructions
+    if args.imagespecialinstructions:
+        image_special_instructions = args.imagespecialinstructions
         
 
     conversation = [{"role": "system", "content": systemPrompt}]
@@ -390,14 +409,14 @@ def main():
             meme_count = int(userEnteredCount)
 
     else:
-        if args.userPrompt:
-            userEnteredPrompt = args.userPrompt
+        if args.userprompt:
+            userEnteredPrompt = args.userprompt
         else:
             userEnteredPrompt = "anything"
 
         meme_count = 1
-        if args.memeCount:
-            meme_count = int(args.memeCount)
+        if args.memecount:
+            meme_count = int(args.memecount)
 
 
     def single_meme_generation_loop():
