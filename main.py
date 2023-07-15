@@ -22,9 +22,8 @@ import os
 import textwrap
 import sys
 import argparse
+import configparser
 
-# Import local script files
-import utils
 
 # ----------------------------------------- Settings -----------------------------------------
 
@@ -79,9 +78,23 @@ parser.add_argument("--basic-instructions", help=f"The basic instructions to use
 parser.add_argument("--image-special-instructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
 args = parser.parse_args()
 
+# Returns a dictionary of the config file
+def getConfig(configFilePath):
+    configRaw = configparser.ConfigParser()
+    configRaw.optionxform = lambda option: option # This must be included otherwise the config file will be read in all lowercase
+    configRaw.read(configFilePath)
+
+    # Go through all the config files, convert to dictionary
+    config = {}
+    for section in configRaw.sections():
+        for key in configRaw[section]:
+            config[key] = configRaw[section][key] # Do not use parseConfigSetting() here or else it will convert all values to lowercase
+            
+    return config
+
 # Get API key constants from config file or command line arguments
 try:
-    keysDict = utils.getConfig("api_keys.ini")
+    keysDict = getConfig("api_keys.ini")
     OPENAI_KEY = args.openaiKey if args.openaiKey else keysDict.get('OpenAI', '')
     CLIPDROP_KEY = args.clipdropKey if args.clipdropKey else keysDict.get('ClipDrop', '')
     STABILITY_KEY = args.stabilityKey if args.stabilityKey else keysDict.get('StabilityAI', '')
