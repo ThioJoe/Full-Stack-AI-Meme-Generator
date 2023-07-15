@@ -13,6 +13,7 @@ import warnings
 import re
 from base64 import b64decode
 from PIL import Image, ImageDraw, ImageFont
+from collections import namedtuple
 import io
 from datetime import datetime
 import random
@@ -50,10 +51,13 @@ font_file = "arial.ttf"
 # ==============================================================================================
 
 # Construct the system prompt for the chat bot
-format_instructions = f'You are a meme generator with the following formatting instructions. Each meme will consist of text that will appear at the top, and an image to go along with it. The user will send you a message with a general theme or concept on which you will base the meme. The user may choose to send you a text saying something like "anything" or "whatever you want", or even no text at all, which you should not take literally, but take to mean they wish for you to come up with something yourself.  The memes don\'t necessarily need to start with "when", but they can. In any case, you will respond with two things: First, the text of the meme that will be displayed in the final meme. Second, some text that will be used as an image prompt for an AI image generator to generate an image to also be used as part of the meme. You must respond only in the format as described next, because your response will be parsed, so it is important it conforms to the format. The first line of your response should be: "Meme Text: " followed by the meme text. The second line of your response should be: "Image Prompt: " followed by the image prompt text.  --- Now here are additional instructions... '
-basicInstructionAppend = f'Next are instructions for the overall approach you should take to creating the memes. Interpret as best as possible: {basic_instructions} | '
-specialInstructionsAppend = f'Next are any special instructions for the image prompt. For example, if the instructions are "the images should be photographic style", your prompt may append ", photograph" at the end, or begin with "photograph of". It does not have to literally match the instruction but interpret as best as possible: {image_special_instructions}'
-systemPrompt = format_instructions + basicInstructionAppend + specialInstructionsAppend
+def construct_system_prompt(basic_instructions, image_special_instructions):
+    format_instructions = f'You are a meme generator with the following formatting instructions. Each meme will consist of text that will appear at the top, and an image to go along with it. The user will send you a message with a general theme or concept on which you will base the meme. The user may choose to send you a text saying something like "anything" or "whatever you want", or even no text at all, which you should not take literally, but take to mean they wish for you to come up with something yourself.  The memes don\'t necessarily need to start with "when", but they can. In any case, you will respond with two things: First, the text of the meme that will be displayed in the final meme. Second, some text that will be used as an image prompt for an AI image generator to generate an image to also be used as part of the meme. You must respond only in the format as described next, because your response will be parsed, so it is important it conforms to the format. The first line of your response should be: "Meme Text: " followed by the meme text. The second line of your response should be: "Image Prompt: " followed by the image prompt text.  --- Now here are additional instructions... '
+    basicInstructionAppend = f'Next are instructions for the overall approach you should take to creating the memes. Interpret as best as possible: {basic_instructions} | '
+    specialInstructionsAppend = f'Next are any special instructions for the image prompt. For example, if the instructions are "the images should be photographic style", your prompt may append ", photograph" at the end, or begin with "photograph of". It does not have to literally match the instruction but interpret as best as possible: {image_special_instructions}'
+    systemPrompt = format_instructions + basicInstructionAppend + specialInstructionsAppend
+    
+    return systemPrompt
 
 # =============================================== Argument Parser ================================================
 # Parse the arguments at the start of the script
@@ -68,6 +72,9 @@ parser.add_argument("--temperature", help="The temperature to use for the chat b
 parser.add_argument("--basicinstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
 parser.add_argument("--imagespecialinstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
 args = parser.parse_args()
+
+# Create a namedtuple classes
+ApiKeysTupleClass = namedtuple('ApiKeysTupleClass', ['openai_key', 'clipdrop_key', 'stability_key'])
 
 # =============================================== Run Checks and Import Configs  ===============================================
 
@@ -94,80 +101,84 @@ def check_font(font_file):
     # Return the font file path
     return font_file
 
-# Get full path of font file from font file name
-font_file = check_font(font_file)
-
-
 # Returns a dictionary of the config file
-def getConfig(configFilePath):
-    configRaw = configparser.ConfigParser()
-    configRaw.optionxform = lambda option: option # This must be included otherwise the config file will be read in all lowercase
-    configRaw.read(configFilePath)
+def get_config(config_file_path):
+    config_raw = configparser.ConfigParser()
+    config_raw.optionxform = lambda option: option  # This must be included otherwise the config file will be read in all lowercase
+    config_raw.read(config_file_path)
 
     # Go through all the config files, convert to dictionary
     config = {}
-    for section in configRaw.sections():
-        for key in configRaw[section]:
-            config[key] = configRaw[section][key] # Do not use parseConfigSetting() here or else it will convert all values to lowercase
-            
+    for section in config_raw.sections():
+        for key in config_raw[section]:
+            config[key] = config_raw[section][key]  # Do not use parseConfigSetting() here or else it will convert all values to lowercase
+
     return config
 
 # Get API key constants from config file or command line arguments
-try:
-    keysDict = getConfig("api_keys.ini")
-    OPENAI_KEY = args.openaikey if args.openaikey else keysDict.get('OpenAI', '')
-    CLIPDROP_KEY = args.clipdropkey if args.clipdropkey else keysDict.get('ClipDrop', '')
-    STABILITY_KEY = args.stabilitykey if args.stabilitykey else keysDict.get('StabilityAI', '')
-except FileNotFoundError:
-    OPENAI_KEY = args.openaikey if args.openaikey else ''
-    CLIPDROP_KEY = args.clipdropkey if args.clipdropkey else ''
-    STABILITY_KEY = args.stabilitykey if args.stabilitykey else ''
+def get_api_keys(config_file="api_keys.ini", args=None):
+    # Default values
+    openai_key, clipdrop_key, stability_key = '', '', ''
 
-has_openai_key, has_clipdrop_key, has_stability_key = False, False, False
+    # Try to read keys from config file. Default value of '' will be used if not found
+    try:
+        keys_dict = get_config(config_file)
+        openai_key = keys_dict.get('OpenAI', '')
+        clipdrop_key = keys_dict.get('ClipDrop', '')
+        stability_key = keys_dict.get('StabilityAI', '')
+    except FileNotFoundError:
+        print("Config not found, checking for command line arguments.")  # Could not read from config file, will try command-line arguments next
+
+    # Checks if any arguments are not None, and uses those values if so
+    if not all(value is None for value in vars(args).values()):
+        openai_key = args.openaikey if args.openaikey else openai_key
+        clipdrop_key = args.clipdropkey if args.clipdropkey else clipdrop_key
+        stability_key = args.stabilitykey if args.stabilitykey else stability_key
+
+    return ApiKeysTupleClass(openai_key, clipdrop_key, stability_key)
 
 # ------------ VALIDATION ------------
 
-if OPENAI_KEY:
-    has_openai_key = True
-    openai.api_key = OPENAI_KEY
-
-if STABILITY_KEY:
-    has_stability_key = True
-    stability_api = client.StabilityInference(
-        key=STABILITY_KEY, # API Key reference.
-        verbose=True, # Print debug messages.
-        engine="stable-diffusion-xl-1024-v0-9", # Set the engine to use for generation.
-        # Available engines: stable-diffusion-xl-1024-v0-9 stable-diffusion-v1 stable-diffusion-v1-5 stable-diffusion-512-v2-0 stable-diffusion-768-v2-0
-        # stable-diffusion-512-v2-1 stable-diffusion-768-v2-1 stable-diffusion-xl-beta-v2-2-2 stable-inpainting-v1-0 stable-inpainting-512-v2-0
-    )
-
-if CLIPDROP_KEY:
-    has_clipdrop_key = True
-
-# Warn about missing API Keys
-if not has_openai_key:
-    print("\n  ERROR:  No OpenAI API key found. OpenAI API key is required - In order to generate text for the meme text and image prompt. Please add your OpenAI API key to the api_keys.ini file.")
-    input("\nPress Enter to exit...")
-    exit()
-
-# Validate selected image platform and ensure API key is present
-valid_image_platforms = ["openai", "stability", "clipdrop"]
-image_platform = image_platform.lower()
-
-       
-if image_platform in valid_image_platforms:
-    if image_platform == "stability" and not has_stability_key:
-        print("\n  ERROR:  Stability AI was set as the image platform, but no Stability AI API key was found in the api_keys.ini file.")
+def validate_api_keys(apiKeys, image_platform):
+    if not apiKeys.openai_key:
+        print("\n  ERROR:  No OpenAI API key found. OpenAI API key is required - In order to generate text for the meme text and image prompt. Please add your OpenAI API key to the api_keys.ini file.")
         input("\nPress Enter to exit...")
         exit()
-    if image_platform == "clipdrop" and not has_clipdrop_key:
-        print("\n  ERROR:  ClipDrop was set as the image platform, but no ClipDrop API key was found in the api_keys.ini file.")
+
+    valid_image_platforms = ["openai", "stability", "clipdrop"]
+    image_platform = image_platform.lower()
+
+    if image_platform in valid_image_platforms:
+        if image_platform == "stability" and not apiKeys.stability_key:
+            print("\n  ERROR:  Stability AI was set as the image platform, but no Stability AI API key was found in the api_keys.ini file.")
+            input("\nPress Enter to exit...")
+            exit()
+        if image_platform == "clipdrop" and not apiKeys.clipdrop_key:
+            print("\n  ERROR:  ClipDrop was set as the image platform, but no ClipDrop API key was found in the api_keys.ini file.")
+            input("\nPress Enter to exit...")
+            exit()
+    else:
+        print(f'\n  ERROR:  Invalid image platform "{image_platform}". Valid image platforms are: {valid_image_platforms}')
         input("\nPress Enter to exit...")
         exit()
-else:
-    print(f'\n  ERROR:  Invalid image platform "{image_platform}". Valid image platforms are: {valid_image_platforms}')
-    input("\nPress Enter to exit...")
-    exit()
+
+def initialize_api_clients(apiKeys):
+    if apiKeys.openai_key:
+        openai.api_key = apiKeys.openai_key
+
+    if apiKeys.stability_key:
+        stability_api = client.StabilityInference(
+            key=apiKeys.stability_key, # API Key reference.
+            verbose=True, # Print debug messages.
+            engine="stable-diffusion-xl-1024-v0-9", # Set the engine to use for generation.
+            # Available engines: stable-diffusion-xl-1024-v0-9 stable-diffusion-v1 stable-diffusion-v1-5 stable-diffusion-512-v2-0 stable-diffusion-768-v2-0
+            # stable-diffusion-512-v2-1 stable-diffusion-768-v2-1 stable-diffusion-xl-beta-v2-2-2 stable-inpainting-v1-0 stable-inpainting-512-v2-0
+        )
+    else:
+        stability_api = None
+    
+    # Only need to return stability_api because openai.api_key has global scope
+    return stability_api
 
 
 # =============================================== Functions ================================================
@@ -213,20 +224,24 @@ def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, ba
 
 # Gets the meme text and image prompt from the message sent by the chat bot
 def parse_meme(message):
-    pattern = r'Meme Text: *\"?(.*?)\"?\n*\s*Image Prompt: (.*?)$'
+    # The regex pattern to match
+    pattern = r'Meme Text: (\"(.*?)\"|(.*?))\n*\s*Image Prompt: (.*?)$'
+
     match = re.search(pattern, message, re.DOTALL)
 
     if match:
+        # If meme text is enclosed in quotes it will be in group 2, otherwise, it will be in group 3.
+        meme_text = match.group(2) if match.group(2) is not None else match.group(3)
+        
         return {
-            "meme_text": match.group(1),
-            "image_prompt": match.group(2)
+            "meme_text": meme_text,
+            "image_prompt": match.group(4)
         }
-
     else:
         return None
     
 # Sends the user message to the chat bot and returns the chat bot's response
-def send_and_receive_message(userMessage, conversationTemp, temperature=0.5):
+def send_and_receive_message(text_model, userMessage, conversationTemp, temperature=0.5):
     # Prepare to send request along with context by appending user message to previous conversation
     conversationTemp.append({"role": "user", "content": userMessage})
     
@@ -306,7 +321,7 @@ def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.05, buffer
     # Save the result to a file
     new_img.save(filePath)
 
-def image_generation_request(image_prompt, platform):
+def image_generation_request(apiKeys, image_prompt, platform, stability_api=None):
     if platform == "openai":
         openai_response = openai.Image.create(prompt=image_prompt, n=1, size="512x512", response_format="b64_json")
         # Convert image data to virtual file
@@ -315,7 +330,7 @@ def image_generation_request(image_prompt, platform):
         # Write the image data to the virtual file
         virtual_image_file.write(image_data)
     
-    if platform == "stability":
+    if platform == "stability" and stability_api:
         # Set up our initial generation parameters.
         stability_response = stability_api.generate(
             prompt=image_prompt,
@@ -340,32 +355,43 @@ def image_generation_request(image_prompt, platform):
                     #img = Image.open(io.BytesIO(artifact.binary))
                     #img.save(str(artifact.seed)+ ".png") # Save our generated images with their seed number as the filename.
                     virtual_image_file = io.BytesIO(artifact.binary)
-                    
+
     if platform == "clipdrop":
         r = requests.post('https://clipdrop-api.co/text-to-image/v1',
             files = {
                 'prompt': (None, image_prompt, 'text/plain')
             },
-            headers = { 'x-api-key': CLIPDROP_KEY}
+            headers = { 'x-api-key': apiKeys.clipdrop_key}
         )
         if (r.ok):
             virtual_image_file = io.BytesIO(r.content) # r.content contains the bytes of the returned image
         else:
             r.raise_for_status()
-            
+
     return virtual_image_file
 
 # ==================== RUN ====================
 
-def main():
-    # Set global variables from top of script
-    global basic_instructions
-    global image_special_instructions
-    global image_platform
-    global temperature
-    
+# Set default values for parameters to those at top of script, but can be overridden by command line arguments or by being set when called from another script
+def main(
+    text_model=text_model, 
+    temperature=temperature, 
+    basic_instructions=basic_instructions, 
+    image_special_instructions=image_special_instructions, 
+    image_platform=image_platform, 
+    font_file=font_file, 
+    base_file_name=base_file_name, 
+    output_folder=output_folder
+):
     # Parse the arguments
     args = parser.parse_args()
+    
+    # Get api keys and put into tuple
+    apiKeys = get_api_keys(args=args)
+    # Validate api keys
+    validate_api_keys(apiKeys, image_platform)
+    # Initialize api clients. Only get stability_api object back because openai.api_key has global scope
+    stability_api = initialize_api_clients(apiKeys)
 
     # Check if any settings arguments, and replace the default values with the args if so. To run automated from command line, specify at least 1 argument.
     if args.imageplatform:
@@ -377,8 +403,12 @@ def main():
     if args.imagespecialinstructions:
         image_special_instructions = args.imagespecialinstructions
 
+    systemPrompt = construct_system_prompt(basic_instructions, image_special_instructions)
     conversation = [{"role": "system", "content": systemPrompt}]
     userEnteredPrompt = ""
+
+    # Get full path of font file from font file name
+    font_file = check_font(font_file)
 
     # ---------- Start User Input -----------
 
@@ -409,7 +439,7 @@ def main():
 
     def single_meme_generation_loop():
         # Send request to chat bot to generate meme text and image prompt
-        chatResponse = send_and_receive_message(userEnteredPrompt, conversation, temperature)
+        chatResponse = send_and_receive_message(text_model, userEnteredPrompt, conversation, temperature)
 
         # Take chat message and convert to dictionary with meme_text and image_prompt
         memeDict = parse_meme(chatResponse)
@@ -422,7 +452,7 @@ def main():
 
         # Send image prompt to image generator and get image back (Using DALL·E API)
         print("\nSending image creation request...")
-        virtual_image_file = image_generation_request(image_prompt, image_platform)
+        virtual_image_file = image_generation_request(apiKeys, image_prompt, image_platform, stability_api)
 
         # Combine the meme text and image into a meme
         filePath = set_file_path(base_file_name, output_folder)
