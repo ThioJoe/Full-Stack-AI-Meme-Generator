@@ -30,7 +30,7 @@ import utils
 
 # Settings for OpenAI API to generate text to be used as the meme text and image prompt
 text_model = "gpt-4" # Some model examples: "gpt-4", "gpt-3.5-turbo-16k"
-temperature = 1 # Controls randomness. Lowering results in less random completions. Higher temperature results in more random completions.
+temperature = 1.5 # Controls randomness. Lowering results in less random completions. Higher temperature results in more random completions.
 
 # Image Platform settings
 image_platform = "clipdrop" # Possible options: "openai", "stability", "clipdrop"
@@ -65,12 +65,30 @@ if not os.path.isfile(font_file):
         print(f'\n  ERROR:  Font file "{font_file}" not found. Please add the font file to the same folder as this script. Or set the variable above to the name of a font file in the C:\\Windows\\Fonts folder.')
         input("\nPress Enter to exit...")
         exit()
+        
+# Parse the arguments at the start of the script
+parser = argparse.ArgumentParser()
+parser.add_argument("--openaiKey", help="OpenAI API key")
+parser.add_argument("--clipdropKey", help="ClipDrop API key")
+parser.add_argument("--stabilityKey", help="Stability AI API key")
+parser.add_argument("--userPrompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
+parser.add_argument("--memeCount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
+parser.add_argument("--imagePlatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
+parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
+parser.add_argument("--basicInstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
+parser.add_argument("--imageSpecialInstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+args = parser.parse_args()
 
-# Get API key constants from config file
-keysDict = utils.getConfig("api_keys.ini")
-OPENAI_KEY = keysDict['OpenAI']
-CLIPDROP_KEY = keysDict['ClipDrop']
-STABILITY_KEY = keysDict['StabilityAI']
+# Get API key constants from config file or command line arguments
+try:
+    keysDict = utils.getConfig("api_keys.ini")
+    OPENAI_KEY = args.openaiKey if args.openaiKey else keysDict.get('OpenAI', '')
+    CLIPDROP_KEY = args.clipdropKey if args.clipdropKey else keysDict.get('ClipDrop', '')
+    STABILITY_KEY = args.stabilityKey if args.stabilityKey else keysDict.get('StabilityAI', '')
+except FileNotFoundError:
+    OPENAI_KEY = args.openaiKey if args.openaiKey else ''
+    CLIPDROP_KEY = args.clipdropKey if args.clipdropKey else ''
+    STABILITY_KEY = args.stabilityKey if args.stabilityKey else ''
 
 has_openai_key, has_clipdrop_key, has_stability_key = False, False, False
 
@@ -311,19 +329,24 @@ def main():
     global image_platform
     global temperature
     
-    # Use arguments if applicable
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--userPrompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
-    parser.add_argument("--memeCount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
-    parser.add_argument("--imagePlatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
-    parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
-    parser.add_argument("--basicInstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
-    parser.add_argument("--imageSpecialInstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+    # # Use arguments if applicable
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--userPrompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
+    # parser.add_argument("--memeCount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
+    # parser.add_argument("--imagePlatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
+    # parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
+    # parser.add_argument("--basicInstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
+    # parser.add_argument("--imageSpecialInstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+    
+    # # # Get API Keys via arguments
+    # # parser.add_argument("--openaiKey", help="Your OpenAI key. If not specified, the key will be read from the config file.")
+    # # parser.add_argument("--clipdropKey", help="Your ClipDrop key. If not specified, the key will be read from the config file.")
+    # # parser.add_argument("--stabilityKey", help="Your Stability key. If not specified, the key will be read from the config file.")
 
     # Parse the arguments
     args = parser.parse_args()
 
-    # Check if any settings arguments, and replace the default values with the args if so
+    # Check if any settings arguments, and replace the default values with the args if so. To run automated from command line, specify at least 1 argument.
     if args.imagePlatform:
         image_platform = args.imagePlatform
     if args.temperature:
