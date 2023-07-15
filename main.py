@@ -1,7 +1,6 @@
 # AI Meme Generator
 # Creates start-to-finish memes using various AI service APIs. OpenAI's chatGPT to generate the meme text and image prompt, and several optional image generators for the meme picture. Then combines the meme text and image into a meme using Pillow.
 # Author: ThioJoe - https://github.com/ThioJoe
-# Version 1.0.0
 
 # Import installed libraries
 import openai
