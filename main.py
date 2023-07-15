@@ -373,7 +373,7 @@ def image_generation_request(apiKeys, image_prompt, platform, stability_api=None
 # ==================== RUN ====================
 
 # Set default values for parameters to those at top of script, but can be overridden by command line arguments or by being set when called from another script
-def main(
+def generate(
     text_model=text_model, 
     temperature=temperature, 
     basic_instructions=basic_instructions, 
@@ -478,4 +478,4 @@ def main(
     return memeResultsDictsList
 
 if __name__ == "__main__":
-    main()
+    generate()
