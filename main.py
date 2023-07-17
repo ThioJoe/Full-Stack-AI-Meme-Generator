@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # AI Meme Generator
 # Creates start-to-finish memes using various AI service APIs. OpenAI's chatGPT to generate the meme text and image prompt, and several optional image generators for the meme picture. Then combines the meme text and image into a meme using Pillow.
 # Author: ThioJoe - https://github.com/ThioJoe
@@ -30,7 +31,7 @@ import platform
 
 # Settings for OpenAI API to generate text to be used as the meme text and image prompt
 text_model = "gpt-4" # Some model examples: "gpt-4", "gpt-3.5-turbo-16k"
-temperature = 1.5 # Controls randomness. Lowering results in less random completions. Higher temperature results in more random completions.
+temperature = 1 # Controls randomness. Lowering results in less random completions. Higher temperature results in more random completions.
 
 # Image Platform settings
 image_platform = "clipdrop" # Possible options: "openai", "stability", "clipdrop"
@@ -71,6 +72,9 @@ parser.add_argument("--imageplatform", help="The image platform to use. If using
 parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
 parser.add_argument("--basicinstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
 parser.add_argument("--imagespecialinstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+# These don't need to be specified as true/false, just specifying them will set them to true
+parser.add_argument("--nouserinput", action='store_true', help="Will prevent any user input prompts, and will instead use default values or other arguments.")
+parser.add_argument("--nofilesave", action='store_true', help="If specified, the meme will not be saved to a file, and only returned as virtual file part of memeResultsDictsList.")
 args = parser.parse_args()
 
 # Create a namedtuple classes
@@ -166,7 +170,7 @@ def initialize_api_clients(apiKeys):
     if apiKeys.openai_key:
         openai.api_key = apiKeys.openai_key
 
-    if apiKeys.stability_key:
+    if apiKeys.stability_key and image_platform == "stability":
         stability_api = client.StabilityInference(
             key=apiKeys.stability_key, # API Key reference.
             verbose=True, # Print debug messages.
@@ -205,7 +209,7 @@ def set_file_path(baseName, outputFolder):
     if not os.path.exists(outputFolder):
         os.makedirs(outputFolder)
     
-    return filePath
+    return filePath, fileName
     
 # Write or append log file containing the user user message, chat bot meme text, and chat bot image prompt for each meme
 def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, basic=basic_instructions, special=image_special_instructions, platform=image_platform):
@@ -261,7 +265,7 @@ def send_and_receive_message(text_model, userMessage, conversationTemp, temperat
     return chatResponseMessage
 
 
-def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.05, buffer_scale=0.03, font_scale=1):
+def create_meme(image_path, top_text, filePath, fontFile, noFileSave=False, min_scale=0.05, buffer_scale=0.03, font_scale=1):
     print("Creating meme image...")
     
     # Load the image. Can be a path or a file-like object such as IO.BytesIO virtual file
@@ -318,8 +322,16 @@ def create_meme(image_path, top_text, filePath, fontFile, min_scale=0.05, buffer
     new_img.paste(band, (0,0))
     new_img.paste(image, (0, band_height))
 
-    # Save the result to a file
-    new_img.save(filePath)
+    if not noFileSave:
+        # Save the result to a file
+        new_img.save(filePath)
+        
+    # Return image as virtual file
+    virtualMemeFile = io.BytesIO()
+    new_img.save(virtualMemeFile, format="PNG")
+    
+    return virtualMemeFile
+    
 
 def image_generation_request(apiKeys, image_prompt, platform, stability_api=None):
     if platform == "openai":
@@ -374,20 +386,31 @@ def image_generation_request(apiKeys, image_prompt, platform, stability_api=None
 
 # Set default values for parameters to those at top of script, but can be overridden by command line arguments or by being set when called from another script
 def generate(
-    text_model=text_model, 
-    temperature=temperature, 
-    basic_instructions=basic_instructions, 
-    image_special_instructions=image_special_instructions, 
-    image_platform=image_platform, 
-    font_file=font_file, 
-    base_file_name=base_file_name, 
-    output_folder=output_folder
+    text_model=text_model,
+    temperature=temperature,
+    basic_instructions=basic_instructions,
+    image_special_instructions=image_special_instructions,
+    user_entered_prompt="anything",
+    meme_count=1,
+    image_platform=image_platform,
+    font_file=font_file,
+    base_file_name=base_file_name,
+    output_folder=output_folder,
+    openai_key=None,
+    stability_key=None,
+    clipdrop_key=None,
+    noUserInput=False,
+    noFileSave=False
 ):
     # Parse the arguments
-    args = parser.parse_args()
-    
-    # Get api keys and put into tuple
-    apiKeys = get_api_keys(args=args)
+    #args = parser.parse_args()
+
+    # If API Keys not provided as parameters, get them from config file or command line arguments
+    if not openai_key:
+        apiKeys = get_api_keys(args=args)
+    else:
+        apiKeys = ApiKeysTupleClass(openai_key, clipdrop_key, stability_key)
+        
     # Validate api keys
     validate_api_keys(apiKeys, image_platform)
     # Initialize api clients. Only get stability_api object back because openai.api_key has global scope
@@ -402,18 +425,24 @@ def generate(
         basic_instructions = args.basicinstructions
     if args.imagespecialinstructions:
         image_special_instructions = args.imagespecialinstructions
+    if args.nofilesave:
+        noFileSave=True
+    if args.nouserinput:
+        noUserInput=True
 
     systemPrompt = construct_system_prompt(basic_instructions, image_special_instructions)
     conversation = [{"role": "system", "content": systemPrompt}]
-    userEnteredPrompt = ""
 
     # Get full path of font file from font file name
     font_file = check_font(font_file)
 
     # ---------- Start User Input -----------
 
-    # If any arguments are being used, skip the user input
-    if all(value is None for value in vars(args).values()):
+    if noUserInput:
+        userEnteredPrompt = user_entered_prompt
+    
+    # If any arguments are being used (or set to true for store_true arguments), skip the user input and use the arguments or defaults
+    elif all(not value for value in vars(args).values()):
         print("\nEnter a meme subject or concept (Or just hit enter to let the AI decide)")
         userEnteredPrompt = input(" >  ")
         if not userEnteredPrompt:
@@ -455,13 +484,15 @@ def generate(
         virtual_image_file = image_generation_request(apiKeys, image_prompt, image_platform, stability_api)
 
         # Combine the meme text and image into a meme
-        filePath = set_file_path(base_file_name, output_folder)
-        create_meme(virtual_image_file, meme_text, filePath, fontFile=font_file)
-        write_log_file(userEnteredPrompt, memeDict, filePath)
+        filePath,fileName = set_file_path(base_file_name, output_folder)
+        virtualMemeFile = create_meme(virtual_image_file, meme_text, filePath, noFileSave=noFileSave,fontFile=font_file)
+        if not noFileSave:
+            # Write the user message, meme text, and image prompt to a log file
+            write_log_file(userEnteredPrompt, memeDict, filePath)
         
         absoluteFilePath = os.path.abspath(filePath)
         
-        return {"meme_text": meme_text, "image_prompt": image_prompt, "file_path": absoluteFilePath}
+        return {"meme_text": meme_text, "image_prompt": image_prompt, "file_path": absoluteFilePath, "virtual_meme_file": virtualMemeFile, "file_name": fileName}
 
     # Create list of dictionaries to hold the results of each meme so that they can be returned by main() if called from command line
     memeResultsDictsList = []
