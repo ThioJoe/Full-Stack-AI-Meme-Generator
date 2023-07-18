@@ -29,7 +29,8 @@ import configparser
 import platform
 import shutil
 
-
+# Startup Debug
+#input("Debug Mode - Press Enter to continue...")
 # ----------------------------------------- Settings -----------------------------------------
 
 # Settings for OpenAI API to generate text to be used as the meme text and image prompt
@@ -128,7 +129,7 @@ def check_font(font_file):
         if not os.path.isfile(font_file):
             print(f'\n  ERROR:  Font file "{font_file}" not found. Please add the font file to the same folder as this script. Or set the variable above to the name of a font file in the system font folder.')
             input("\nPress Enter to exit...")
-            exit()
+            sys.exit()
     # Return the font file path
     return font_file
 
@@ -147,16 +148,23 @@ def get_config(config_file_path):
     return config
 
 # Get API key constants from config file or command line arguments
-def get_api_keys(config_file="api_keys.ini", args=None):
+def get_api_keys(api_key_filename="api_keys.ini", args=None):
+    default_api_key_filename = "api_keys_empty.ini"
+    
+    def get_assets_file(fileName):
+        if hasattr(sys, '_MEIPASS'): # If running as a pyinstaller bundle
+            return os.path.join(sys._MEIPASS, fileName)
+        return os.path.join(os.path.abspath("assets"), fileName) # If running as script, specifies resource folder as /assets
     
     # Checks if api_keys.ini file exists, if not create empty one from default
     def check_api_key_file():
-        if not os.path.isfile(config_file):
-            # Copy default empty keys file from assets folder
-            shutil.copyfile(os.path.join('assets', 'api_keys_empty.ini'), config_file)
-            print(f'\n  INFO:  Because running for the first time, "{config_file}" was created. Please add your API keys to the API Keys file.')
+        if not os.path.isfile(api_key_filename):
+            file_to_copy_path = get_assets_file(default_api_key_filename)
+            # Copy default empty keys file from assets folder. Use absolute path
+            shutil.copyfile(file_to_copy_path, api_key_filename)
+            print(f'\n  INFO:  Because running for the first time, "{api_key_filename}" was created. Please add your API keys to the API Keys file.')
             input("\nPress Enter to exit...")
-            exit()
+            sys.exit()
 
     # Run check for api_keys.ini file
     check_api_key_file()
@@ -166,7 +174,7 @@ def get_api_keys(config_file="api_keys.ini", args=None):
 
     # Try to read keys from config file. Default value of '' will be used if not found
     try:
-        keys_dict = get_config(config_file)
+        keys_dict = get_config(api_key_filename)
         openai_key = keys_dict.get('OpenAI', '')
         clipdrop_key = keys_dict.get('ClipDrop', '')
         stability_key = keys_dict.get('StabilityAI', '')
@@ -187,7 +195,7 @@ def validate_api_keys(apiKeys, image_platform):
     if not apiKeys.openai_key:
         print("\n  ERROR:  No OpenAI API key found. OpenAI API key is required - In order to generate text for the meme text and image prompt. Please add your OpenAI API key to the api_keys.ini file.")
         input("\nPress Enter to exit...")
-        exit()
+        sys.exit()
 
     valid_image_platforms = ["openai", "stability", "clipdrop"]
     image_platform = image_platform.lower()
@@ -196,15 +204,15 @@ def validate_api_keys(apiKeys, image_platform):
         if image_platform == "stability" and not apiKeys.stability_key:
             print("\n  ERROR:  Stability AI was set as the image platform, but no Stability AI API key was found in the api_keys.ini file.")
             input("\nPress Enter to exit...")
-            exit()
+            sys.exit()
         if image_platform == "clipdrop" and not apiKeys.clipdrop_key:
             print("\n  ERROR:  ClipDrop was set as the image platform, but no ClipDrop API key was found in the api_keys.ini file.")
             input("\nPress Enter to exit...")
-            exit()
+            sys.exit()
     else:
         print(f'\n  ERROR:  Invalid image platform "{image_platform}". Valid image platforms are: {valid_image_platforms}')
         input("\nPress Enter to exit...")
-        exit()
+        sys.exit()
 
 def initialize_api_clients(apiKeys):
     if apiKeys.openai_key:
