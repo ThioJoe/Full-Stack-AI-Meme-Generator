@@ -16,6 +16,7 @@ import warnings
 import re
 from base64 import b64decode
 from PIL import Image, ImageDraw, ImageFont
+from pkg_resources import parse_version
 from collections import namedtuple
 import io
 from datetime import datetime
@@ -336,6 +337,103 @@ def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, ba
                        Chat Bot Image Prompt: {AiMemeDict['image_prompt']}
                        Image Generation Platform: {platform}
                        \n"""))
+        
+        
+def check_for_update(currentVersion=version, updateReleaseChannel=None, silentCheck=False):
+    isUpdateAvailable = False
+    print("\nGetting info about latest updates...\n")
+
+    try:
+        if updateReleaseChannel.lower() == "stable":
+            response = requests.get("https://api.github.com/repos/ThioJoe/Full-Stack-AI-Meme-Generator/releases/latest")
+        elif updateReleaseChannel.lower() == "all":
+            response = requests.get("https://api.github.com/repos/ThioJoe/Full-Stack-AI-Meme-Generator/releases")
+
+        if response.status_code != 200:
+            if response.status_code == 403:
+                if silentCheck == False:
+                    print(f"\nError [U-4]: Got an 403 (ratelimit_reached) when attempting to check for update.")
+                    print(f"This means you have been rate limited by github.com. Please try again in a while.\n")
+                else:
+                    print(f"\nError [U-4]: Got an 403 (ratelimit_reached) when attempting to check for update.")
+                return None
+
+            else:
+                if silentCheck == False:
+                    print(f"Error [U-3]: Got non 200 status code (got: {response.status_code}) when attempting to check for update.\n")
+                    print(f"If this keeps happening, you may want to report the issue here: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/issues")
+                else:
+                    print(f"Error [U-3]: Got non 200 status code (got: {response.status_code}) when attempting to check for update.\n")
+                return None
+
+        else:
+            # assume 200 response (good)
+            if updateReleaseChannel.lower() == "stable":
+                latestVersion = response.json()["name"]
+                isBeta = False
+            elif updateReleaseChannel.lower() == "all":
+                latestVersion = response.json()[0]["name"]
+                # check if latest version is a beta. 
+                # if it is continue, else check for another beta with a higher version in the 10 newest releases 
+                isBeta = response.json()[0]["prerelease"]
+                if (isBeta == False): 
+                    for i in range(9):
+                        # add a "+ 1" to index to not count the first release (already checked)
+                        latestVersion2 = response.json()[i + 1]["name"]
+                        # make sure the version is higher than the current version
+                        if parse_version(latestVersion2) > parse_version(latestVersion):
+                            # update original latest version to the new version
+                            latestVersion = latestVersion2
+                            isBeta = response.json()[i + 1]["prerelease"]
+                            # exit loop
+                            break
+
+    except OSError as ox:
+        if "WinError 10013" in str(ox):
+            print(f"WinError 10013: The OS blocked the connection to GitHub. Check your firewall settings.\n")
+        else:
+            print(f"Unknown OSError Error occurred while checking for updates\n")
+        return None
+    except Exception as e:
+        if silentCheck == False:
+            print(str(e) + "\n")
+            print(f"Error [Code U-1]: Problem while checking for updates. See above error for more details.\n")
+            print("If this keeps happening, you may want to report the issue here: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/issues")
+        elif silentCheck == True:
+            print(f"Error [Code U-1]: Unknown problem while checking for updates. See above error for more details.\n")
+        return None
+
+    if parse_version(latestVersion) > parse_version(currentVersion):
+        if isBeta == True:
+            isUpdateAvailable = "beta"
+        else:
+            isUpdateAvailable = True
+
+        if silentCheck == False:
+            print("----------------------------- UPDATE AVAILABLE -------------------------------------------")
+            if isBeta == True:
+                print(f" A new beta version is available! To see what's new visit: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/releases ")
+            else:
+                print(f" A new version is available! To see what's new visit: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/releases ")
+            print(f"     > Current Version: {currentVersion}")
+            print(f"     > Latest Version: {latestVersion}")
+            if isBeta == True:
+                print("(To stop receiving beta releases, change the 'release_channel' setting in the config file)")
+            print("------------------------------------------------------------------------------------------")
+            
+        elif silentCheck == True:
+            return isUpdateAvailable
+
+    elif parse_version(latestVersion) == parse_version(currentVersion):
+        if silentCheck == False:
+            print(f"\nYou have the latest version: " + currentVersion)
+        return False
+    else:
+        if silentCheck == False:
+            print("\nNo newer release available - Your Version: " + currentVersion + "    --    Latest Version: " + latestVersion)
+        return False
+    
+    return isUpdateAvailable
 
 # Gets the meme text and image prompt from the message sent by the chat bot
 def parse_meme(message):
@@ -508,7 +606,8 @@ def generate(
     stability_key=None,
     clipdrop_key=None,
     noUserInput=False,
-    noFileSave=False
+    noFileSave=False,
+    release_channel="all"
 ):
     
     # Load default settings from settings.ini file. Will be overridden by command line arguments, or ignored if Use_This_Config is set to False
@@ -523,7 +622,7 @@ def generate(
         font_file = settings.get('Font_File', font_file)
         base_file_name = settings.get('Base_File_Name', base_file_name)
         output_folder = settings.get('Output_Folder', output_folder)
-        
+        release_channel = settings.get('Release_Channel', release_channel)
     
     # Parse the arguments
     args = parser.parse_args()
@@ -558,9 +657,18 @@ def generate(
 
     # Get full path of font file from font file name
     font_file = check_font(font_file)
+    
+    if not noUserInput:
+        # Check for updates
+        if release_channel.lower() == "all" or release_channel.lower() == "stable":
+            updateAvailable = check_for_update(version, release_channel, silentCheck=False)
+            if updateAvailable:
+                input("\nPress Enter to continue...")
+    # Clear console
+    os.system('cls' if os.name == 'nt' else 'clear')
 
     # ---------- Start User Input -----------
-    
+    # Display Header
     print(f"\n==================== AI Meme Generator - {version} ====================")
 
     if noUserInput:
