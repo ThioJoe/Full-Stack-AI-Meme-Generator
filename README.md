@@ -1,6 +1,6 @@
 # Full Stack AI Meme Generator
 
-Allows you to automatically generate meme images from start to finish using AI. It will generate the text for the meme (optionally based on a user-provided concept), create a related image, and combine the two into a final image file.
+#### Allows you to automatically generate meme images from start to finish using AI. It will generate the text for the meme (optionally based on a user-provided concept), create a related image, and combine the two into a final image file.
 ----------------------
 <p align="center"><img src="https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/assets/12518330/9beefed6-1efa-4eba-b87f-ad3ae16c9809" width=35%></p>
 
@@ -40,3 +40,35 @@ Chat Bot Meme Text: "When you finally find the perfect napping spot... on the la
 Chat Bot Image Prompt: "A photograph of a cat laying down on an open laptop."
 Image Generation Platform: clipdrop
 ```
+
+## Optional Arguments
+### You can also pass options into the program via command-line arguments whether using the python version or exe version.
+
+#### • API Key Arguments: Not necessary if the keys are already in api_keys.ini
+`--openaikey`: OpenAI API key.
+
+`--clipdropkey`: ClipDrop API key.
+
+`--stabilitykey`: Stability AI API key.
+
+#### • Basic Meme Arguments
+
+`--userprompt`: A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.
+
+`--memecount`: The number of memes to create. If using arguments and not specified, the default is 1.
+
+#### • Advanced Meme Settings Arguments
+
+`--imageplatform`: The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'.
+
+`--temperature`: The temperature to use for the chat bot. If using arguments and not specified, the default is 1.0.
+
+`--basicinstructions`: The basic instructions to use for the chat bot. If using arguments and not specified, the default is "You will create funny memes that are clever and original, and not cliche or lame.".
+
+`--imagespecialinstructions`: The image special instructions to use for the chat bot. The default is "The images should be photographic.".
+
+#### • Binary arguments: Just adding them activates them, no text needs to accompany them
+
+`--nouserinput`: If specified, this will prevent any user input prompts, and will instead use default values or other arguments.
+
+`--nofilesave`: If specified, the meme will not be saved to a file, and only returned as virtual file part of memeResultsDictsList.
