@@ -41,13 +41,18 @@ basic_instructions = r'You will create funny memes that are clever and original,
 # You can use this to tell it how to generate the image itself. You can specify a style such as being a photograph, drawing, etc, or something more specific such as always use cats in the pictures.
 image_special_instructions = r'The images should be photographic.' 
 
-# Outputted file names will be based on this text. For example, 'meme' will create 'meme.png', 'meme-1.png', 'meme-2.png', etc.
-base_file_name = "meme"
-# Relative Output Folder
-output_folder = "Outputs"
-# The font to use for the meme text. Must be put in the current folder or in the default Windows font directory, and must be a TrueType font file (.ttf). You can find font files in the C:\Windows\Fonts folder on Windows.
+# ----------------------------------------- Advanced Settings -----------------------------------------
+
+# The font to use for the meme text. Must be a TrueType font file (.ttf). Must either be put in the current folder, or already be in your system's default font directory.
+# The script currently checks the "C:\Windows\Fonts folder" on Windows, and several directories on Linux and MacOS.
+# See: https://learn.microsoft.com/en-us/typography/fonts/windows_10_font_list
 font_file = "arial.ttf"
 
+# Outputted file names will be based on this text. For example, 'meme' will create 'meme.png', 'meme-1.png', 'meme-2.png', etc.
+base_file_name = "meme"
+
+# Relative Output Folder
+output_folder = "Outputs"
 
 # ==============================================================================================
 
@@ -91,12 +96,31 @@ def check_font(font_file):
             font_file = os.path.join(os.environ['WINDIR'], 'Fonts', font_file)
         elif platform.system() == "Linux":
             # Check for font file in font directories (Linux)
-            font_directories = ["/usr/share/fonts", "~/.fonts"]
+            font_directories = ["/usr/share/fonts", "~/.fonts", "~/.local/share/fonts", "/usr/local/share/fonts"]
+            found = False
             for dir in font_directories:
-                potential_font_file = os.path.join(dir, font_file)
-                if os.path.isfile(potential_font_file):
-                    font_file = potential_font_file
+                dir = os.path.expanduser(dir)
+                for root, dirs, files in os.walk(dir):
+                    if font_file in files:
+                        font_file = os.path.join(root, font_file)
+                        found = True
+                        break
+                if found:
                     break
+        elif platform.system() == "Darwin":  # Darwin is the underlying system for macOS
+            # Check for font file in font directories (macOS)
+            font_directories = ["/Library/Fonts", "~/Library/Fonts"]
+            found = False
+            for dir in font_directories:
+                dir = os.path.expanduser(dir)
+                for root, dirs, files in os.walk(dir):
+                    if font_file in files:
+                        font_file = os.path.join(root, font_file)
+                        found = True
+                        break
+                if found:
+                    break
+
         # Warn user and exit if not found
         if not os.path.isfile(font_file):
             print(f'\n  ERROR:  Font file "{font_file}" not found. Please add the font file to the same folder as this script. Or set the variable above to the name of a font file in the system font folder.')
