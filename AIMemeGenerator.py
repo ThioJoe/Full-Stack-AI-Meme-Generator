@@ -489,27 +489,25 @@ def generate(
         userEnteredPrompt = user_entered_prompt
     
     # If any arguments are being used (or set to true for store_true arguments), skip the user input and use the arguments or defaults
-    elif all(not value for value in vars(args).values()):
-        print("\nEnter a meme subject or concept (Or just hit enter to let the AI decide)")
-        userEnteredPrompt = input(" >  ")
-        if not userEnteredPrompt:
-            userEnteredPrompt = "anything"
-            
-        # Set the number of memes to create
-        meme_count = 1
-        print("\nEnter the number of memes to create (Or just hit Enter for 1): ")
-        userEnteredCount = input(" >  ")
-        if userEnteredCount:
-            meme_count = int(userEnteredCount)
-
     else:
-        if args.userprompt:
-            userEnteredPrompt = args.userprompt
+        # If no user prompt argument set, get user input for prompt
+        if not args.userprompt:
+            print("\nEnter a meme subject or concept (Or just hit enter to let the AI decide)")
+            userEnteredPrompt = input(" >  ")
+            if not userEnteredPrompt: # If user puts in nothing, set to "anything"
+                userEnteredPrompt = "anything"
         else:
-            userEnteredPrompt = "anything"
-
-        meme_count = 1
-        if args.memecount:
+            userEnteredPrompt = args.userprompt
+        
+        # If no meme count argument set, get user input for meme count
+        if not args.memecount:
+            # Set the number of memes to create
+            meme_count = 1 # Default will be none if nothing entered
+            print("\nEnter the number of memes to create (Or just hit Enter for 1): ")
+            userEnteredCount = input(" >  ")
+            if userEnteredCount:
+                meme_count = int(userEnteredCount)
+        else:
             meme_count = int(args.memecount)
 
 
