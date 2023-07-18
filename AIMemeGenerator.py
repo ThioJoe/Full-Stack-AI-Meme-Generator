@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # AI Meme Generator
 # Creates start-to-finish memes using various AI service APIs. OpenAI's chatGPT to generate the meme text and image prompt, and several optional image generators for the meme picture. Then combines the meme text and image into a meme using Pillow.
-# Author: ThioJoe - https://github.com/ThioJoe
+# Author: ThioJoe
+# Project Page: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator
+version = "1.0.0"
 
 # Import installed libraries
 import openai
@@ -25,6 +27,7 @@ import sys
 import argparse
 import configparser
 import platform
+import shutil
 
 
 # ----------------------------------------- Settings -----------------------------------------
@@ -145,6 +148,19 @@ def get_config(config_file_path):
 
 # Get API key constants from config file or command line arguments
 def get_api_keys(config_file="api_keys.ini", args=None):
+    
+    # Checks if api_keys.ini file exists, if not create empty one from default
+    def check_api_key_file():
+        if not os.path.isfile(config_file):
+            # Copy default empty keys file from assets folder
+            shutil.copyfile(os.path.join('assets', 'api_keys_empty.ini'), config_file)
+            print(f'\n  INFO:  Because running for the first time, "{config_file}" was created. Please add your API keys to the API Keys file.')
+            input("\nPress Enter to exit...")
+            exit()
+
+    # Run check for api_keys.ini file
+    check_api_key_file()
+    
     # Default values
     openai_key, clipdrop_key, stability_key = '', '', ''
 
@@ -282,9 +298,6 @@ def send_and_receive_message(text_model, userMessage, conversationTemp, temperat
 
     chatResponseMessage = chatResponse.choices[0].message.content
     chatResponseRole = chatResponse.choices[0].message.role
-
-    #print("\n" + chatResponseMessage)
-    #conversationTemp.append({"role": chatResponseRole, "content": chatResponseMessage})
 
     return chatResponseMessage
 
@@ -427,7 +440,7 @@ def generate(
     noFileSave=False
 ):
     # Parse the arguments
-    #args = parser.parse_args()
+    args = parser.parse_args()
 
     # If API Keys not provided as parameters, get them from config file or command line arguments
     if not openai_key:
@@ -461,6 +474,8 @@ def generate(
     font_file = check_font(font_file)
 
     # ---------- Start User Input -----------
+    
+    print(f"\n==================== AI Meme Generator - {version} ====================")
 
     if noUserInput:
         userEnteredPrompt = user_entered_prompt
