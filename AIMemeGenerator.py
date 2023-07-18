@@ -135,32 +135,79 @@ def check_font(font_file):
     # Return the font file path
     return font_file
 
+def parseBool(string, silent=False):
+    if type(string) == str:
+        if string.lower() == 'true':
+            return True
+        elif string.lower() == 'false':
+            return False
+        else:
+            if not silent:
+                raise ValueError(f'Invalid value "{string}". Must be "True" or "False"')
+            elif silent:
+                return string
+    elif type(string) == bool:
+        if string == True:
+            return True
+        elif string == False:
+            return False
+    else:
+        raise ValueError('Not a valid boolean string')
+
 # Returns a dictionary of the config file
 def get_config(config_file_path):
     config_raw = configparser.ConfigParser()
     config_raw.optionxform = lambda option: option  # This must be included otherwise the config file will be read in all lowercase
     config_raw.read(config_file_path)
 
-    # Go through all the config files, convert to dictionary
+    # Go through ini config file and create dictionary of all settings
     config = {}
     for section in config_raw.sections():
         for key in config_raw[section]:
-            config[key] = config_raw[section][key]  # Do not use parseConfigSetting() here or else it will convert all values to lowercase
+            settingValue = config_raw[section][key]
+            # Remove quotes from string values
+            settingValue = settingValue.strip("\"").strip("\'")
+            # Check if it is boolean
+            if type(parseBool(settingValue, silent=True)) == bool:
+                settingValue = parseBool(settingValue)
+            config[key] = settingValue  # Do not use parseConfigSetting() here or else it will convert all values to lowercase
 
     return config
 
+def get_assets_file(fileName):
+    if hasattr(sys, '_MEIPASS'): # If running as a pyinstaller bundle
+        return os.path.join(sys._MEIPASS, fileName)
+    return os.path.join(os.path.abspath("assets"), fileName) # If running as script, specifies resource folder as /assets
+
+
 def get_settings(settings_filename="settings.ini"):
-    settings = get_config(settings_filename)
+    default_settings_filename = "settings_default.ini"
+    def check_settings_file():
+        if not os.path.isfile(settings_filename):
+            file_to_copy_path = get_assets_file(default_settings_filename)
+            shutil.copyfile(file_to_copy_path, settings_filename)
+            print("\nINFO: Settings file not found, so default 'settings.ini' file created. You can use it going forward to change more advanced settings if you want.")
+            input("\nPress Enter to continue...")
+    
+    check_settings_file()
+    # Try to get settings file, if fails, use default settings
+    try:
+        settings = get_config(settings_filename)
+        pass
+    except:
+        settings = get_config(get_assets_file(default_settings_filename))
+        print("\nERROR: Could not read settings file. Using default settings instead.")
+        
+    # If something went wrong and empty settings, will use default settings
+    if settings == {}:
+        settings = get_config(get_assets_file(default_settings_filename))
+        print("\nERROR: Something went wrong reading the settings file. Using default settings instead.")
+        
     return settings
 
 # Get API key constants from config file or command line arguments
 def get_api_keys(api_key_filename="api_keys.ini", args=None):
     default_api_key_filename = "api_keys_empty.ini"
-    
-    def get_assets_file(fileName):
-        if hasattr(sys, '_MEIPASS'): # If running as a pyinstaller bundle
-            return os.path.join(sys._MEIPASS, fileName)
-        return os.path.join(os.path.abspath("assets"), fileName) # If running as script, specifies resource folder as /assets
     
     # Checks if api_keys.ini file exists, if not create empty one from default
     def check_api_key_file():
