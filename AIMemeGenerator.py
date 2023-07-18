@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw, ImageFont
 from collections import namedtuple
 import io
 from datetime import datetime
-import random
+import glob
 import string
 import os
 import textwrap
@@ -28,6 +28,8 @@ import argparse
 import configparser
 import platform
 import shutil
+
+# Get settings 
 
 # Startup Debug
 #input("Debug Mode - Press Enter to continue...")
@@ -78,7 +80,7 @@ parser.add_argument("--stabilitykey", help="Stability AI API key")
 parser.add_argument("--userprompt", help="A meme subject or concept to send to the chat bot. If not specified, the user will be prompted to enter a subject or concept.")
 parser.add_argument("--memecount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
 parser.add_argument("--imageplatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
-parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 0.7")
+parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 1.0")
 parser.add_argument("--basicinstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
 parser.add_argument("--imagespecialinstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
 # These don't need to be specified as true/false, just specifying them will set them to true
@@ -146,6 +148,10 @@ def get_config(config_file_path):
             config[key] = config_raw[section][key]  # Do not use parseConfigSetting() here or else it will convert all values to lowercase
 
     return config
+
+def get_settings(settings_filename="settings.ini"):
+    settings = get_config(settings_filename)
+    return settings
 
 # Get API key constants from config file or command line arguments
 def get_api_keys(api_key_filename="api_keys.ini", args=None):
@@ -237,27 +243,37 @@ def initialize_api_clients(apiKeys):
 
 # Sets the name and path of the file to be used
 def set_file_path(baseName, outputFolder):
-    def generate_random_string(length):
-        # Define the characters to choose from
-        characters = string.ascii_uppercase
-        # Generate a random string of specified length
-        random_string = ''.join(random.choice(characters) for _ in range(length))
-        return random_string
+    def get_next_counter():
+        # Check existing files in the directory
+        existing_files = glob.glob(os.path.join(outputFolder, baseName + "_" + timestamp + "_*.png"))
 
-    # Generate random 3 digit number
-    randString = generate_random_string(5)
+        # Get the highest existing counter, if any
+        max_counter = 0
+        for file in existing_files:
+            try:
+                counter = int(os.path.basename(file).split('_')[-1].split('.')[0])
+                max_counter = max(max_counter, counter)
+            except ValueError:
+                pass
+        # Return the next available counter
+        return max_counter + 1
+
     # Generate a timestamp string to append to the file name
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M")
-    # Set the file name
-    fileName = baseName + "_" + timestamp + "_" + randString + ".png"
-    
-    filePath = os.path.join(outputFolder, fileName)
     
     # If the output folder does not exist, create it
     if not os.path.exists(outputFolder):
         os.makedirs(outputFolder)
     
+    # Get the next counter number
+    file_counter = get_next_counter()
+
+    # Set the file name
+    fileName = baseName + "_" + timestamp + "_" + str(file_counter) + ".png"
+    filePath = os.path.join(outputFolder, fileName)
+    
     return filePath, fileName
+
     
 # Write or append log file containing the user user message, chat bot meme text, and chat bot image prompt for each meme
 def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, basic=basic_instructions, special=image_special_instructions, platform=image_platform):
@@ -447,6 +463,21 @@ def generate(
     noUserInput=False,
     noFileSave=False
 ):
+    
+    # Load default settings from settings.ini file. Will be overridden by command line arguments, or ignored if Use_This_Config is set to False
+    settings = get_settings()
+    use_config = settings.get('Use_This_Config', False) # If set to False, will ignore the settings.ini file
+    if use_config:
+        text_model = settings.get('Text_Model', text_model)
+        temperature = float(settings.get('Temperature', temperature))
+        basic_instructions = settings.get('Basic_Instructions', basic_instructions)
+        image_special_instructions = settings.get('Image_Special_Instructions', image_special_instructions)
+        image_platform = settings.get('Image_Platform', image_platform)
+        font_file = settings.get('Font_File', font_file)
+        base_file_name = settings.get('Base_File_Name', base_file_name)
+        output_folder = settings.get('Output_Folder', output_folder)
+        
+    
     # Parse the arguments
     args = parser.parse_args()
 
