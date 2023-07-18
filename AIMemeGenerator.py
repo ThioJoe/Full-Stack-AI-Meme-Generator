@@ -487,6 +487,7 @@ def generate(
 
     if noUserInput:
         userEnteredPrompt = user_entered_prompt
+        meme_count = meme_count # Use default set in function parameter (1)
     
     # If any arguments are being used (or set to true for store_true arguments), skip the user input and use the arguments or defaults
     else:
