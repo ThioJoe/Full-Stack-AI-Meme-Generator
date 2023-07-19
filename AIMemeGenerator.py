@@ -3,7 +3,7 @@
 # Creates start-to-finish memes using various AI service APIs. OpenAI's chatGPT to generate the meme text and image prompt, and several optional image generators for the meme picture. Then combines the meme text and image into a meme using Pillow.
 # Author: ThioJoe
 # Project Page: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator
-version = "1.0.1"
+version = "1.0.2"
 
 # Import installed libraries
 import openai
@@ -30,37 +30,6 @@ import configparser
 import platform
 import shutil
 
-# Get settings 
-
-# Startup Debug
-#input("Debug Mode - Press Enter to continue...")
-# ----------------------------------------- Settings -----------------------------------------
-
-# Settings for OpenAI API to generate text to be used as the meme text and image prompt
-text_model = "gpt-4" # Some model examples: "gpt-4", "gpt-3.5-turbo-16k"
-temperature = 1 # Controls randomness. Lowering results in less random completions. Higher temperature results in more random completions.
-
-# Image Platform settings
-image_platform = "clipdrop" # Possible options: "openai", "stability", "clipdrop"
-
-# This is NOT the individual meme image prompt. Here you can change this to tell it the general style or qualities to apply to all memes, such as using dark humor, surreal humor, wholesome, etc. 
-basic_instructions = r'You will create funny memes that are clever and original, and not cliche or lame.'
-# You can use this to tell it how to generate the image itself. You can specify a style such as being a photograph, drawing, etc, or something more specific such as always use cats in the pictures.
-image_special_instructions = r'The images should be photographic.' 
-
-# ----------------------------------------- Advanced Settings -----------------------------------------
-
-# The font to use for the meme text. Must be a TrueType font file (.ttf). Must either be put in the current folder, or already be in your system's default font directory.
-# The script currently checks the "C:\Windows\Fonts folder" on Windows, and several directories on Linux and MacOS.
-# See: https://learn.microsoft.com/en-us/typography/fonts/windows_10_font_list
-font_file = "arial.ttf"
-
-# Outputted file names will be based on this text. For example, 'meme' will create 'meme.png', 'meme-1.png', 'meme-2.png', etc.
-base_file_name = "meme"
-
-# Relative Output Folder
-output_folder = "Outputs"
-
 # ==============================================================================================
 
 # Construct the system prompt for the chat bot
@@ -82,8 +51,8 @@ parser.add_argument("--userprompt", help="A meme subject or concept to send to t
 parser.add_argument("--memecount", help="The number of memes to create. If using arguments and not specified, the default is 1.")
 parser.add_argument("--imageplatform", help="The image platform to use. If using arguments and not specified, the default is 'clipdrop'. Possible options: 'openai', 'stability', 'clipdrop'")
 parser.add_argument("--temperature", help="The temperature to use for the chat bot. If using arguments and not specified, the default is 1.0")
-parser.add_argument("--basicinstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, the default is '{basic_instructions}'")
-parser.add_argument("--imagespecialinstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, the default is '{image_special_instructions}'")
+parser.add_argument("--basicinstructions", help=f"The basic instructions to use for the chat bot. If using arguments and not specified, default will be used.")
+parser.add_argument("--imagespecialinstructions", help=f"The image special instructions to use for the chat bot. If using arguments and not specified, default will be used")
 # These don't need to be specified as true/false, just specifying them will set them to true
 parser.add_argument("--nouserinput", action='store_true', help="Will prevent any user input prompts, and will instead use default values or other arguments.")
 parser.add_argument("--nofilesave", action='store_true', help="If specified, the meme will not be saved to a file, and only returned as virtual file part of memeResultsDictsList.")
@@ -268,7 +237,7 @@ def validate_api_keys(apiKeys, image_platform):
         input("\nPress Enter to exit...")
         sys.exit()
 
-def initialize_api_clients(apiKeys):
+def initialize_api_clients(apiKeys, image_platform):
     if apiKeys.openai_key:
         openai.api_key = apiKeys.openai_key
 
@@ -324,7 +293,7 @@ def set_file_path(baseName, outputFolder):
 
     
 # Write or append log file containing the user user message, chat bot meme text, and chat bot image prompt for each meme
-def write_log_file(userPrompt, AiMemeDict, filePath, logFolder=output_folder, basic=basic_instructions, special=image_special_instructions, platform=image_platform):
+def write_log_file(userPrompt, AiMemeDict, filePath, logFolder, basic, special, platform):
     # Get file name from path
     memeFileName = os.path.basename(filePath)
     with open(os.path.join(logFolder, "log.txt"), "a", encoding='utf-8') as log_file:
@@ -592,16 +561,16 @@ def image_generation_request(apiKeys, image_prompt, platform, stability_api=None
 
 # Set default values for parameters to those at top of script, but can be overridden by command line arguments or by being set when called from another script
 def generate(
-    text_model=text_model,
-    temperature=temperature,
-    basic_instructions=basic_instructions,
-    image_special_instructions=image_special_instructions,
+    text_model="gpt-4",
+    temperature=1.0,
+    basic_instructions=r'You will create funny memes that are clever and original, and not cliche or lame.',
+    image_special_instructions=r'The images should be photographic.',
     user_entered_prompt="anything",
     meme_count=1,
-    image_platform=image_platform,
-    font_file=font_file,
-    base_file_name=base_file_name,
-    output_folder=output_folder,
+    image_platform="openai",
+    font_file="arial.ttf",
+    base_file_name="meme",
+    output_folder="Outputs",
     openai_key=None,
     stability_key=None,
     clipdrop_key=None,
@@ -636,7 +605,7 @@ def generate(
     # Validate api keys
     validate_api_keys(apiKeys, image_platform)
     # Initialize api clients. Only get stability_api object back because openai.api_key has global scope
-    stability_api = initialize_api_clients(apiKeys)
+    stability_api = initialize_api_clients(apiKeys, image_platform)
 
     # Check if any settings arguments, and replace the default values with the args if so. To run automated from command line, specify at least 1 argument.
     if args.imageplatform:
@@ -720,7 +689,7 @@ def generate(
         virtualMemeFile = create_meme(virtual_image_file, meme_text, filePath, noFileSave=noFileSave,fontFile=font_file)
         if not noFileSave:
             # Write the user message, meme text, and image prompt to a log file
-            write_log_file(userEnteredPrompt, memeDict, filePath)
+            write_log_file(userEnteredPrompt, memeDict, filePath, output_folder, basic_instructions, image_special_instructions, image_platform)
         
         absoluteFilePath = os.path.abspath(filePath)
         
