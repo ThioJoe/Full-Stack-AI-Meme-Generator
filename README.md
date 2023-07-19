@@ -7,6 +7,7 @@
 ## Features
 
 - Uses OpenAI's GPT-4 to generate the text and image prompt for the meme.
+- Automatically sends image prompt request to an AI image generator of choice, then combines the text and image
 - Allows customization of the meme generation process through various settings.
 - Generates memes with a user-provided subject or concept, or you can let the AI decide.
 - Logs meme generation details for future reference.
