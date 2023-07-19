@@ -2,7 +2,7 @@
 
 #### Allows you to automatically generate meme images from start to finish using AI. It will generate the text for the meme (optionally based on a user-provided concept), create a related image, and combine the two into a final image file.
 ----------------------
-<p align="center"><img src="https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/assets/12518330/9beefed6-1efa-4eba-b87f-ad3ae16c9809" width=35%></p>
+<p align="center"><img src="https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/assets/12518330/2d8ee7cc-a7d3-40ca-a894-64e10085db14" width=35%></p>
 
 ## Features
 
@@ -29,7 +29,7 @@ Various settings for the meme generation process can be customized:
 - Special Image Instructions: You can tell the AI how to generate the image itself (more specifically,  how to write the image prompt). You can specify a style such as being a photograph, drawing, etc, or something more specific such as always using cats in the pictures.
 
 ## Example Image Output With Log
-<p align="center"><img src="https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/assets/12518330/28e82079-4244-463e-9370-b5665c5fedd7" width="400"></p>
+<p align="center"><img src="https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/assets/12518330/6400c973-f7af-45ed-a6ad-c062c2be0b64" width="400"></p>
 
 ```
 Meme File Name: meme_2023-07-13-15-34_ZYKCV.png
