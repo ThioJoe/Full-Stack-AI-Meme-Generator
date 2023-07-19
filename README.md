@@ -13,11 +13,10 @@
 
 ## Usage
 
-1. Clone the repository.
-2. Install the necessary Python packages.
-3. Obtain at least an OpenAI API key, but it is recommended to also use APIs from Clipdrop or Stability AI (DreamStudio) for the image generation stage.
-4. Edit the settings variables in the script.
-5. Run the script and enter a meme subject or concept when prompted (optional).
+1. For Python Version Only: Clone the repository & Install the necessary packages.
+2. Obtain at least an OpenAI API key, but it is recommended to also use APIs from Clipdrop or Stability AI (DreamStudio) for the image generation stage.
+3. Edit the settings variables in the settings.ini file.
+4. Run the script and enter a meme subject or concept when prompted (optional).
 
 ## Settings
 
