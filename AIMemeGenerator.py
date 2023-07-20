@@ -320,19 +320,15 @@ def check_for_update(currentVersion=version, updateReleaseChannel=None, silentCh
 
         if response.status_code != 200:
             if response.status_code == 403:
+                print(f"\nError [U-4]: Got an 403 (ratelimit_reached) when attempting to check for update.")
                 if silentCheck == False:
-                    print(f"\nError [U-4]: Got an 403 (ratelimit_reached) when attempting to check for update.")
                     print(f"This means you have been rate limited by github.com. Please try again in a while.\n")
-                else:
-                    print(f"\nError [U-4]: Got an 403 (ratelimit_reached) when attempting to check for update.")
                 return None
 
             else:
+                print(f"Error [U-3]: Got non 200 status code (got: {response.status_code}) when attempting to check for update.\n")
                 if silentCheck == False:
-                    print(f"Error [U-3]: Got non 200 status code (got: {response.status_code}) when attempting to check for update.\n")
                     print(f"If this keeps happening, you may want to report the issue here: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/issues")
-                else:
-                    print(f"Error [U-3]: Got non 200 status code (got: {response.status_code}) when attempting to check for update.\n")
                 return None
 
         else:
