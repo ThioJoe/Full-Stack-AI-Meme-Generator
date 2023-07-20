@@ -3,7 +3,7 @@
 # Creates start-to-finish memes using various AI service APIs. OpenAI's chatGPT to generate the meme text and image prompt, and several optional image generators for the meme picture. Then combines the meme text and image into a meme using Pillow.
 # Author: ThioJoe
 # Project Page: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator
-version = "1.0.2"
+version = "1.0.3"
 
 # Import installed libraries
 import openai
@@ -698,13 +698,25 @@ def generate(
     # Create list of dictionaries to hold the results of each meme so that they can be returned by main() if called from command line
     memeResultsDictsList = []
 
-    for i in range(meme_count):
-        print("\n----------------------------------------------------------------------------------------------------")
-        print(f"Generating meme {i+1} of {meme_count}...")
-        memeInfoDict = single_meme_generation_loop()
+    try:
+        for i in range(meme_count):
+            print("\n----------------------------------------------------------------------------------------------------")
+            print(f"Generating meme {i+1} of {meme_count}...")
+            memeInfoDict = single_meme_generation_loop()
 
-        # Add meme info dict to list of meme results
-        memeResultsDictsList.append(memeInfoDict)
+            # Add meme info dict to list of meme results
+            memeResultsDictsList.append(memeInfoDict)
+            
+        # Once finished, print output directory path and confirm exit
+        print("\n\nFinished. Output directory: " + os.path.abspath(output_folder))
+        if not noUserInput:
+            input("\nPress Enter to exit...")
+        
+    except Exception as ex:
+        print(f"\n  ERROR:  An error occurred while generating the meme. Error: {ex}")
+        if not noUserInput:
+            input("\nPress Enter to exit...")
+        sys.exit()
     
     # If called from command line, will return the list of meme results
     return memeResultsDictsList
