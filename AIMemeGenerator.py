@@ -761,6 +761,21 @@ def generate(
         if not noUserInput:
             input("\nPress Enter to exit...")
         sys.exit()
+        
+    except openai.error.InvalidRequestError as irx:
+        print(f"\n  ERROR:  {irx}")
+        if "The model" in str(irx) and "does not exist" in str(irx):
+            #if 'gpt-4' in str(irx):
+            if str(irx) == "The model `gpt-4` does not exist":
+                print("  (!) Note: This error actually means you do not have access to the GPT-4 model yet.")
+                print("  (!)       You can see more about the current GPT-4 requirements here: https://help.openai.com/en/articles/7102672-how-can-i-access-gpt-4")
+                print("  (!)       Also ensure your country is supported: https://platform.openai.com/docs/supported-countries")
+            else:
+                print("   > Either the model name is incorrect, or you do not have access to it.")
+                print("   > See this page to see the model names to use in the API: https://platform.openai.com/docs/models/overview")
+        if not noUserInput:
+            input("\nPress Enter to exit...")
+        sys.exit()
     
     except Exception as ex:
         print(f"\n  ERROR:  An error occurred while generating the meme. Error: {ex}")
