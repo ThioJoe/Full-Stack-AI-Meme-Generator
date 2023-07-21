@@ -421,11 +421,13 @@ def check_for_update(currentVersion=version, updateReleaseChannel=None, silentCh
 
     elif parse_version(latestVersion) == parse_version(currentVersion):
         if silentCheck == False:
-            print(f"\nYou have the latest version: " + currentVersion)
+            #print(f"\nYou have the latest version: " + currentVersion)
+            pass
         return False
     else:
         if silentCheck == False:
-            print("\nNo newer release available - Your Version: " + currentVersion + "    --    Latest Version: " + latestVersion)
+            #print("\nNo newer release available - Your Version: " + currentVersion + "    --    Latest Version: " + latestVersion)
+            pass
         return False
     
     return isUpdateAvailable
