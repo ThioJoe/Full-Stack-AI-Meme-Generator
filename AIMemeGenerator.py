@@ -160,7 +160,7 @@ def parseBool(string, silent=False):
 def get_config(config_file_path):
     config_raw = configparser.ConfigParser()
     config_raw.optionxform = lambda option: option  # This must be included otherwise the config file will be read in all lowercase
-    config_raw.read(config_file_path)
+    config_raw.read(config_file_path, encoding='utf-8')
 
     # Go through ini config file and create dictionary of all settings
     config = {}
