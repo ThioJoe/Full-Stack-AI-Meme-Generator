@@ -72,3 +72,10 @@ Image Generation Platform: clipdrop
 `--nouserinput`: If specified, this will prevent any user input prompts, and will instead use default values or other arguments.
 
 `--nofilesave`: If specified, the meme will not be saved to a file, and only returned as virtual file part of memeResultsDictsList.
+
+## How to Build Exe Yourself
+#### Note: To build the exe you have to set up the python environment anyway, so by that point you can just run the python version of the script. But if you want the build the exe yourself anyway here is how:
+1. Ensure required packages are installed
+2. Additionally, install PyInstaller: `pip install pyinstaller` (If using a virtual environment, install it into that)
+3. Run this command in terminal from within the project directory: `python -m PyInstaller main.spec`
+
