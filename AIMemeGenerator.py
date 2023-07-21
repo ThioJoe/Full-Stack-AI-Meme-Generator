@@ -50,6 +50,39 @@ args = parser.parse_args()
 # Create a namedtuple classes
 ApiKeysTupleClass = namedtuple('ApiKeysTupleClass', ['openai_key', 'clipdrop_key', 'stability_key'])
 
+# Create custom exceptions
+class NoFontFileError(Exception):
+    def __init__(self, message, font_file):
+        full_error_message = f'Font file "{font_file}" not found. Please add the font file to the same folder as this script. Or set the variable above to the name of a font file in the system font folder.'
+        
+        super().__init__(full_error_message)
+        self.font_file = font_file
+        self.simple_message = message
+        
+class MissingOpenAIKeyError(Exception):
+    def __init__(self, message):
+        full_error_message = f"No OpenAI API key found. OpenAI API key is required - In order to generate text for the meme text and image prompt. Please add your OpenAI API key to the api_keys.ini file."
+        
+        super().__init__(full_error_message)
+        self.simple_message = message    
+        
+class MissingAPIKeyError(Exception):
+    def __init__(self, message, api_platform):
+        full_error_message = f"{api_platform} was set as the image platform, but no {api_platform} API key was found in the api_keys.ini file."
+        
+        super().__init__(full_error_message)
+        self.api_platform = api_platform
+        self.simple_message = message
+
+class InvalidImagePlatformError(Exception):
+    def __init__(self, message, given_platform, valid_platforms):
+        full_error_message = f"Invalid image platform '{given_platform}'. Valid image platforms are: {valid_platforms}"
+        
+        super().__init__(full_error_message)
+        self.given_platform = given_platform
+        self.valid_platforms = valid_platforms
+        self.simple_message = message
+
 # ==============================================================================================
 
 # Construct the system prompt for the chat bot
@@ -99,9 +132,8 @@ def check_font(font_file):
 
         # Warn user and exit if not found
         if not os.path.isfile(font_file):
-            print(f'\n  ERROR:  Font file "{font_file}" not found. Please add the font file to the same folder as this script. Or set the variable above to the name of a font file in the system font folder.')
-            input("\nPress Enter to exit...")
-            sys.exit()
+            raise NoFontFileError(f'Font file "{font_file}" not found.', font_file)
+        
     # Return the font file path
     return font_file
 
@@ -216,26 +248,20 @@ def get_api_keys(api_key_filename="api_keys.ini", args=None):
 
 def validate_api_keys(apiKeys, image_platform):
     if not apiKeys.openai_key:
-        print("\n  ERROR:  No OpenAI API key found. OpenAI API key is required - In order to generate text for the meme text and image prompt. Please add your OpenAI API key to the api_keys.ini file.")
-        input("\nPress Enter to exit...")
-        sys.exit()
+        raise MissingOpenAIKeyError("No OpenAI API key found.")
 
     valid_image_platforms = ["openai", "stability", "clipdrop"]
     image_platform = image_platform.lower()
 
     if image_platform in valid_image_platforms:
         if image_platform == "stability" and not apiKeys.stability_key:
-            print("\n  ERROR:  Stability AI was set as the image platform, but no Stability AI API key was found in the api_keys.ini file.")
-            input("\nPress Enter to exit...")
-            sys.exit()
+            raise MissingAPIKeyError("No Stability AI API key found.", "Stability AI")
+
         if image_platform == "clipdrop" and not apiKeys.clipdrop_key:
-            print("\n  ERROR:  ClipDrop was set as the image platform, but no ClipDrop API key was found in the api_keys.ini file.")
-            input("\nPress Enter to exit...")
-            sys.exit()
+            raise MissingAPIKeyError("No ClipDrop API key found.", "ClipDrop")
+
     else:
-        print(f'\n  ERROR:  Invalid image platform "{image_platform}". Valid image platforms are: {valid_image_platforms}')
-        input("\nPress Enter to exit...")
-        sys.exit()
+        raise InvalidImagePlatformError(f'Invalid image platform provided.', image_platform, valid_image_platforms)
 
 def initialize_api_clients(apiKeys, image_platform):
     if apiKeys.openai_key:
@@ -625,14 +651,21 @@ def generate(
     conversation = [{"role": "system", "content": systemPrompt}]
 
     # Get full path of font file from font file name
-    font_file = check_font(font_file)
+    try:
+        font_file = check_font(font_file)
+    except NoFontFileError as fx:
+        print(f"\n  ERROR:  {fx}")
+        if not noUserInput:
+            input("\nPress Enter to exit...")
+        sys.exit()
     
+    # Check for updates
     if not noUserInput:
-        # Check for updates
         if release_channel.lower() == "all" or release_channel.lower() == "stable":
             updateAvailable = check_for_update(version, release_channel, silentCheck=False)
             if updateAvailable:
                 input("\nPress Enter to continue...")
+                
     # Clear console
     os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -665,7 +698,8 @@ def generate(
                 meme_count = int(userEnteredCount)
         else:
             meme_count = int(args.memecount)
-
+            
+    # ----------------------------------------------------------------------------------------------------
 
     def single_meme_generation_loop():
         # Send request to chat bot to generate meme text and image prompt
@@ -694,11 +728,15 @@ def generate(
         absoluteFilePath = os.path.abspath(filePath)
         
         return {"meme_text": meme_text, "image_prompt": image_prompt, "file_path": absoluteFilePath, "virtual_meme_file": virtualMemeFile, "file_name": fileName}
+    
+    # ----------------------------------------------------------------------------------------------------
 
     # Create list of dictionaries to hold the results of each meme so that they can be returned by main() if called from command line
     memeResultsDictsList = []
 
+    # CORE GENERATION LOOPS
     try:
+        
         for i in range(meme_count):
             print("\n----------------------------------------------------------------------------------------------------")
             print(f"Generating meme {i+1} of {meme_count}...")
@@ -711,7 +749,19 @@ def generate(
         print("\n\nFinished. Output directory: " + os.path.abspath(output_folder))
         if not noUserInput:
             input("\nPress Enter to exit...")
+    
+    except MissingOpenAIKeyError as ox:
+        print(f"\n  ERROR:  {ox}")
+        if not noUserInput:
+            input("\nPress Enter to exit...")
+        sys.exit()
         
+    except MissingAPIKeyError as ax:
+        print(f"\n  ERROR:  {ax}")
+        if not noUserInput:
+            input("\nPress Enter to exit...")
+        sys.exit()
+    
     except Exception as ex:
         print(f"\n  ERROR:  An error occurred while generating the meme. Error: {ex}")
         if not noUserInput:
