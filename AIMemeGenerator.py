@@ -3,7 +3,7 @@
 # Creates start-to-finish memes using various AI service APIs. OpenAI's chatGPT to generate the meme text and image prompt, and several optional image generators for the meme picture. Then combines the meme text and image into a meme using Pillow.
 # Author: ThioJoe
 # Project Page: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator
-version = "1.0.3"
+version = "1.0.4"
 
 # Import installed libraries
 import openai
@@ -770,8 +770,9 @@ def generate(
             #if 'gpt-4' in str(irx):
             if str(irx) == "The model `gpt-4` does not exist":
                 print("  (!) Note: This error actually means you do not have access to the GPT-4 model yet.")
-                print("  (!)       You can see more about the current GPT-4 requirements here: https://help.openai.com/en/articles/7102672-how-can-i-access-gpt-4")
-                print("  (!)       Also ensure your country is supported: https://platform.openai.com/docs/supported-countries")
+                print("  (!)       - You can see more about the current GPT-4 requirements here: https://help.openai.com/en/articles/7102672-how-can-i-access-gpt-4")
+                print("  (!)       - Also ensure your country is supported: https://platform.openai.com/docs/supported-countries")
+                print("  (!)       - You can try the 'gpt-3.5-turbo' model instead. See more here: https://platform.openai.com/docs/models/overview)")
             else:
                 print("   > Either the model name is incorrect, or you do not have access to it.")
                 print("   > See this page to see the model names to use in the API: https://platform.openai.com/docs/models/overview")
