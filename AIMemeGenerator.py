@@ -3,19 +3,20 @@
 # Creates start-to-finish memes using various AI service APIs. OpenAI's chatGPT to generate the meme text and image prompt, and several optional image generators for the meme picture. Then combines the meme text and image into a meme using Pillow.
 # Author: ThioJoe
 # Project Page: https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator
-version = "1.0.4"
+version = "1.0.5"
 
 # Import installed libraries
 import openai
 from stability_sdk import client
 import stability_sdk.interfaces.gooseai.generation.generation_pb2 as generation
+from PIL import Image, ImageDraw, ImageFont
+import requests
 
 # Import standard libraries
-import requests
+
 import warnings
 import re
 from base64 import b64decode
-from PIL import Image, ImageDraw, ImageFont
 from pkg_resources import parse_version
 from collections import namedtuple
 import io
@@ -29,6 +30,7 @@ import argparse
 import configparser
 import platform
 import shutil
+import traceback
 
 # =============================================== Argument Parser ================================================
 # Parse the arguments at the start of the script
@@ -265,7 +267,7 @@ def validate_api_keys(apiKeys, image_platform):
 
 def initialize_api_clients(apiKeys, image_platform):
     if apiKeys.openai_key:
-        openai.api_key = apiKeys.openai_key
+        openai_api = openai.OpenAI(api_key=apiKeys.openai_key)
 
     if apiKeys.stability_key and image_platform == "stability":
         stability_api = client.StabilityInference(
@@ -279,7 +281,7 @@ def initialize_api_clients(apiKeys, image_platform):
         stability_api = None
     
     # Only need to return stability_api because openai.api_key has global scope
-    return stability_api
+    return stability_api, openai_api
 
 
 # =============================================== Functions ================================================
@@ -451,12 +453,12 @@ def parse_meme(message):
         return None
     
 # Sends the user message to the chat bot and returns the chat bot's response
-def send_and_receive_message(text_model, userMessage, conversationTemp, temperature=0.5):
+def send_and_receive_message(openai_api, text_model, userMessage, conversationTemp, temperature=0.5):
     # Prepare to send request along with context by appending user message to previous conversation
     conversationTemp.append({"role": "user", "content": userMessage})
     
     print("Sending request to write meme...")
-    chatResponse = openai.ChatCompletion.create(
+    chatResponse = openai_api.chat.completions.create(
         model=text_model,
         messages=conversationTemp,
         temperature=temperature
@@ -536,11 +538,11 @@ def create_meme(image_path, top_text, filePath, fontFile, noFileSave=False, min_
     return virtualMemeFile
     
 
-def image_generation_request(apiKeys, image_prompt, platform, stability_api=None):
+def image_generation_request(apiKeys, image_prompt, platform, openai_api, stability_api=None):
     if platform == "openai":
-        openai_response = openai.Image.create(prompt=image_prompt, n=1, size="512x512", response_format="b64_json")
+        openai_response = openai_api.images.generate(model="dall-e-3", prompt=image_prompt, n=1, size="1024x1024", response_format="b64_json")
         # Convert image data to virtual file
-        image_data = b64decode(openai_response["data"][0]["b64_json"])
+        image_data = b64decode(openai_response.data[0].model_dump()["b64_json"])
         virtual_image_file = io.BytesIO()
         # Write the image data to the virtual file
         virtual_image_file.write(image_data)
@@ -632,8 +634,8 @@ def generate(
         
     # Validate api keys
     validate_api_keys(apiKeys, image_platform)
-    # Initialize api clients. Only get stability_api object back because openai.api_key has global scope
-    stability_api = initialize_api_clients(apiKeys, image_platform)
+    # Initialize api clients
+    stability_api, openai_api = initialize_api_clients(apiKeys, image_platform)
 
     # Check if any settings arguments, and replace the default values with the args if so. To run automated from command line, specify at least 1 argument.
     if args.imageplatform:
@@ -705,7 +707,7 @@ def generate(
 
     def single_meme_generation_loop():
         # Send request to chat bot to generate meme text and image prompt
-        chatResponse = send_and_receive_message(text_model, userEnteredPrompt, conversation, temperature)
+        chatResponse = send_and_receive_message(openai_api, text_model, userEnteredPrompt, conversation, temperature)
 
         # Take chat message and convert to dictionary with meme_text and image_prompt
         memeDict = parse_meme(chatResponse)
@@ -718,7 +720,7 @@ def generate(
 
         # Send image prompt to image generator and get image back (Using DALL·E API)
         print("\nSending image creation request...")
-        virtual_image_file = image_generation_request(apiKeys, image_prompt, image_platform, stability_api)
+        virtual_image_file = image_generation_request(apiKeys, image_prompt, image_platform, openai_api, stability_api)
 
         # Combine the meme text and image into a meme
         filePath,fileName = set_file_path(base_file_name, output_folder)
@@ -764,11 +766,12 @@ def generate(
             input("\nPress Enter to exit...")
         sys.exit()
         
-    except openai.error.InvalidRequestError as irx:
-        print(f"\n  ERROR:  {irx}")
-        if "The model" in str(irx) and "does not exist" in str(irx):
+    #except openai.error.InvalidRequestError as irx:
+    except openai.NotFoundError as nfx:
+        print(f"\n  ERROR:  {nfx}")
+        if "The model" in str(nfx) and "does not exist" in str(nfx):
             #if 'gpt-4' in str(irx):
-            if str(irx) == "The model `gpt-4` does not exist":
+            if str(nfx) == "The model `gpt-4` does not exist":
                 print("  (!) Note: This error actually means you do not have access to the GPT-4 model yet.")
                 print("  (!)       - You can see more about the current GPT-4 requirements here: https://help.openai.com/en/articles/7102672-how-can-i-access-gpt-4")
                 print("  (!)       - Also ensure your country is supported: https://platform.openai.com/docs/supported-countries")
@@ -781,6 +784,8 @@ def generate(
         sys.exit()
     
     except Exception as ex:
+        # Print traceback info
+        traceback.print_exc()
         print(f"\n  ERROR:  An error occurred while generating the meme. Error: {ex}")
         if not noUserInput:
             input("\nPress Enter to exit...")
