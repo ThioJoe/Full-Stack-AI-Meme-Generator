@@ -4,6 +4,9 @@
 ----------------------
 <p align="center"><img src="https://github.com/ThioJoe/Full-Stack-AI-Meme-Generator/assets/12518330/2d8ee7cc-a7d3-40ca-a894-64e10085db14" width=35%></p>
 
+https://www.youtube.com/watch?v=7LBLESXAJh0
+https://twitter.com/ShitpostMemesAI
+
 ## Features
 
 - Uses OpenAI's GPT-4 to generate the text and image prompt for the meme.
@@ -16,7 +19,8 @@
 
 1. For Python Version Only: Clone the repository & Install the necessary packages.
 2. Obtain at least an OpenAI API key, but it is recommended to also use APIs from Clipdrop or Stability AI (DreamStudio) for the image generation stage.
-3. Edit the settings variables in the settings.ini file.
+  2a. https://help.openai.com/en/articles/4936850-where-do-i-find-my-secret-api-key, https://clipdrop.co/apis
+3 Edit the settings variables in the settings.ini file.
 4. Run the script and enter a meme subject or concept when prompted (optional).
 
 ## Settings
